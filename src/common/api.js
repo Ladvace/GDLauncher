@@ -176,3 +176,7 @@ export const getSearch = (
   };
   return axios.get(url, { params });
 };
+
+export const getOptifineHomePage = () => {
+  return axios.get('https://optifine.net/downloads');
+};

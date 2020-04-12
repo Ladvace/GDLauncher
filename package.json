@@ -156,6 +156,7 @@
     "antd": "4.1.1",
     "axios": "https://github.com/gorilla-devs/axios.git#62786f2b6c4c813d4dc0159744bcdce7342e365d",
     "base64-stream": "^1.0.0",
+    "cheerio": "^1.0.0-rc.3",
     "connected-react-router": "^6.8.0",
     "craco-antd": "^1.14.1",
     "discord-rpc": "^3.1.0",

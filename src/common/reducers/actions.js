@@ -50,7 +50,8 @@ import {
   getAddonFiles,
   getAddon,
   getAddonCategories,
-  getMultipleAddons
+  getMultipleAddons,
+  getOptifineHomePage
 } from '../api';
 import {
   _getCurrentAccount,
@@ -63,7 +64,8 @@ import {
   _getAccounts,
   _getTempPath,
   _getInstance,
-  _getDataStorePath
+  _getDataStorePath,
+  _getOptifineVersionsPath
 } from '../utils/selectors';
 import {
   librariesMapper,
@@ -81,7 +83,8 @@ import {
   isMod,
   isInstanceFolderPath,
   getFileHash,
-  getFilesRecursive
+  getFilesRecursive,
+  parseOptifineVersions
 } from '../../app/desktop/utils';
 import {
   downloadFile,
@@ -92,6 +95,42 @@ import { UPDATE_CONCURRENT_DOWNLOADS } from './settings/actionTypes';
 import { UPDATE_MODAL } from './modals/actionTypes';
 import PromiseQueue from '../../app/desktop/utils/PromiseQueue';
 import fmlLibsMapping from '../../app/desktop/utils/fmllibs';
+
+const getOptifine = instanceName => {
+  return async (dispatch, getState) => {
+    const state = getState();
+
+    const {
+      downloadQueue: {
+        [instanceName]: { optifine: optifineVersionName }
+      }
+    } = state;
+
+    if (optifineVersionName) {
+      const optifineHomePage = await getOptifineHomePage();
+      const optifineManifest = parseOptifineVersions(optifineHomePage);
+      const optifineVersionsPath = _getOptifineVersionsPath(state);
+      const url = optifineManifest[optifineVersionName.split(' ')[1]].filter(
+        x => x.name === optifineVersionName
+      )[0].download;
+      const html = await axios.get(url);
+      const ret = /<a href='downloadx\?(.+?)'/.exec(html.data);
+      console.log(
+        'CORBELLERIE',
+        url,
+        html,
+        ret,
+        path.join(optifineVersionsPath, `${optifineVersionName}.jar`)
+      );
+      if (ret && ret[1]) {
+        return {
+          url: `https://optifine.net/downloadx?${ret[1]}`,
+          path: path.join(optifineVersionsPath, `${optifineVersionName}.jar`)
+        };
+      }
+    }
+  };
+};
 
 export function initManifests() {
   return async (dispatch, getState) => {
@@ -148,12 +187,26 @@ export function initManifests() {
       });
       return omitBy(forgeVersions, v => v.length === 0);
     };
+
+    const getOptifineVersions = async () => {
+      const html = await getOptifineHomePage();
+      const versions = parseOptifineVersions(html);
+      console.log('vvv', versions);
+      dispatch({
+        type: ActionTypes.UPDATE_OPTIFINE_MANIFEST,
+        versions
+      });
+      return versions;
+    };
+
     // Using reflect to avoid rejection
-    const [fabric, java, categories, forge] = await Promise.all([
+    const [fabric, java, categories, forge, optifine] = await Promise.all([
       reflect(getFabricVersions()),
       reflect(getJavaManifestVersions()),
       reflect(getAddonCategoriesVersions()),
-      reflect(getForgeVersions())
+      reflect(getForgeVersions()),
+      reflect(getForgeVersions()),
+      reflect(getOptifineVersions())
     ]);
 
     if (fabric.e || java.e || categories.e || forge.e) {
@@ -165,7 +218,8 @@ export function initManifests() {
       fabric: fabric.status ? fabric.v : app.fabricManifest,
       java: java.status ? java.v : app.javaManifest,
       categories: categories.status ? categories.v : app.curseforgeCategories,
-      forge: forge.status ? forge.v : app.forgeManifest
+      forge: forge.status ? forge.v : app.forgeManifest,
+      optifine: optifine.status ? optifine.v : app.optifineManifest
     };
   };
 }
@@ -1262,8 +1316,12 @@ export function downloadInstance(instanceName) {
       );
     };
 
+    const optifineObj = await dispatch(getOptifine(instanceName));
+
     await downloadInstanceFiles(
-      [...libraries, ...assets, mcMainFile],
+      optifineObj
+        ? [...libraries, ...assets, mcMainFile, optifineObj]
+        : [...libraries, ...assets, mcMainFile],
       updatePercentage,
       state.settings.concurrentDownloads
     );
