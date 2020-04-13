@@ -10,12 +10,10 @@ import lt from 'semver/functions/lt';
 import lte from 'semver/functions/lte';
 import gt from 'semver/functions/gt';
 import omitBy from 'lodash/omitBy';
-import flatten from 'lodash/flatten';
 import { pipeline } from 'stream';
 import zlib from 'zlib';
 import lockfile from 'lockfile';
 import omit from 'lodash/omit';
-import chunk from 'lodash/chunk';
 import Seven, { extractFull } from 'node-7z';
 import { push } from 'connected-react-router';
 import { spawn } from 'child_process';
@@ -50,7 +48,6 @@ import {
   getAddonFiles,
   getAddon,
   getAddonCategories,
-  getMultipleAddons,
   getOptifineHomePage
 } from '../api';
 import {
@@ -84,6 +81,9 @@ import {
   isInstanceFolderPath,
   getFileHash,
   getFilesRecursive,
+  filterForgeFilesByVersion,
+  filterFabricFilesByVersion,
+  getPatchedInstanceType,
   parseOptifineVersions
 } from '../../app/desktop/utils';
 import {
@@ -943,7 +943,7 @@ export function downloadForge(instanceName) {
       }
 
       dispatch(
-        updateDownloadStatus(instanceName, 'Downloading forge files...')
+        updateDownloadStatus(instanceName, 'Downloading forge libraries...')
       );
 
       let { libraries } = forgeJson.version;
@@ -1044,6 +1044,9 @@ export function downloadForge(instanceName) {
         { concurrency: state.settings.concurrentDownloads }
       );
 
+      dispatch(updateDownloadStatus(instanceName, 'Injecting forge...'));
+      dispatch(updateDownloadProgress(0));
+
       // Perform forge injection
       const mcJarPath = path.join(
         _getMinecraftVersionsPath(state),
@@ -1076,10 +1079,14 @@ export function downloadForge(instanceName) {
         path.join(_getTempPath(state), modloader[2]),
         {
           $bin: sevenZipPath,
-          yes: true
+          yes: true,
+          $progress: true
         }
       );
       await new Promise((resolve, reject) => {
+        extraction.on('progress', ({ percent }) => {
+          dispatch(updateDownloadProgress(percent / 2));
+        });
         extraction.on('end', () => {
           resolve();
         });
@@ -1093,10 +1100,14 @@ export function downloadForge(instanceName) {
         `${path.join(_getTempPath(state), modloader[2])}/*`,
         {
           $bin: sevenZipPath,
-          yes: true
+          yes: true,
+          $progress: true
         }
       );
       await new Promise((resolve, reject) => {
+        updatedFiles.on('progress', ({ percent }) => {
+          dispatch(updateDownloadProgress(50 + percent / 2));
+        });
         updatedFiles.on('end', () => {
           resolve();
         });
@@ -1522,6 +1533,10 @@ export const startListener = () => {
           );
           try {
             const config = await fse.readJSON(configPath);
+
+            if (!config.modloader) {
+              throw new Error(`Config for ${instanceName} could not be parsed`);
+            }
             console.log('[RTS] ADDING INSTANCE', instanceName);
             dispatch({
               type: ActionTypes.UPDATE_INSTANCES,
@@ -1565,6 +1580,11 @@ export const startListener = () => {
               'config.json'
             );
             const config = await fse.readJSON(configPath);
+            if (!config.modloader) {
+              throw new Error(
+                `Config for ${newInstanceName} could not be parsed`
+              );
+            }
             console.log(
               `[RTS] RENAMING INSTANCE ${oldInstanceName} -> ${newInstanceName}`
             );
@@ -2130,23 +2150,31 @@ export const initLatestMods = instanceName => {
       ?.map(v => v.projectID);
 
     // Check which mods need to be initialized
-    const modsToInit = modIds.filter(v => {
+    const modsToInit = modIds?.filter(v => {
       return !latestModManifests[v];
     });
 
-    if (modsToInit.length === 0) return;
+    if (!modsToInit || modsToInit?.length === 0) return;
 
     // Need to split in multiple requests
-    const chunks = chunk(modsToInit, 80);
-    const manifests = await Promise.all(
-      chunks.map(async c => {
-        const { data } = await getMultipleAddons(c);
-        return data;
-      })
+    const manifests = await pMap(
+      modsToInit,
+      async mod => {
+        const { data } = await getAddonFiles(mod);
+        return { projectID: mod, data };
+      },
+      { concurrency: 40 }
     );
     const manifestsObj = {};
-    flatten(manifests).map(v => {
-      manifestsObj[v.id] = v.gameVersionLatestFiles;
+    manifests.map(v => {
+      // Find latest version for each mod
+      const [latestMod] =
+        getPatchedInstanceType(instance) === FORGE || v.projectID === 361988
+          ? filterForgeFilesByVersion(v.data, instance.modloader[1])
+          : filterFabricFilesByVersion(v.data, instance.modloader[1]);
+      if (latestMod) {
+        manifestsObj[v.projectID] = latestMod;
+      }
       return null;
     });
 

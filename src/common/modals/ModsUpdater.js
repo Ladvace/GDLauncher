@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo } from 'react';
 import styled from 'styled-components';
 import { useDispatch, useSelector } from 'react-redux';
 import { Progress } from 'antd';
-import pMap from 'p-map';
 import Modal from '../components/Modal';
 import { updateMod } from '../reducers/actions';
 import { closeModal } from '../reducers/modals/actions';
@@ -17,40 +16,46 @@ const ModsUpdater = ({ instanceName }) => {
 
   const filterAvailableUpdates = () => {
     return instance.mods.filter(mod => {
-      const latestMod = latestMods[mod.projectID]?.find(
-        v => v.gameVersion === instance.modloader[1]
+      return (
+        latestMods[mod.projectID] && latestMods[mod.projectID].id !== mod.fileID
       );
-      return latestMod && latestMod.projectFileId !== mod.fileID;
     });
   };
 
   const totalMods = useMemo(() => filterAvailableUpdates(), []);
 
-  const updateMods = async () => {
-    await pMap(
-      totalMods,
-      async mod => {
-        const latestMod = latestMods[mod.projectID]?.find(
-          v => v.gameVersion === instance.modloader[1]
-        );
+  useEffect(() => {
+    let cancel = false;
+    const updateMods = async () => {
+      let i = 0;
+      while (!cancel && i < totalMods.length) {
+        const mod = totalMods[i];
         await dispatch(
           updateMod(
             instanceName,
             mod,
-            latestMod.projectFileId,
+            latestMods[mod.projectID].id,
             instance.modloader[1],
-            p => setInstallProgress(p)
+            // eslint-disable-next-line
+            p => {
+              if (!cancel) setInstallProgress(p);
+            }
           )
         );
-        setComputedMods(p => p + 1);
-      },
-      { concurrency: 1 }
-    );
-    dispatch(closeModal());
-  };
+        if (!cancel) {
+          setComputedMods(p => p + 1);
+        }
+        i += 1;
+      }
+      if (!cancel) {
+        dispatch(closeModal());
+      }
+    };
 
-  useEffect(() => {
     updateMods();
+    return () => {
+      cancel = true;
+    };
   }, []);
 
   return (
