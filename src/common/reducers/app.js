@@ -65,6 +65,15 @@ function curseforgeCategories(state = [], action) {
   }
 }
 
+function optifineManifest(state = {}, action) {
+  switch (action.type) {
+    case ActionTypes.UPDATE_OPTIFINE_MANIFEST:
+      return action.versions;
+    default:
+      return state;
+  }
+}
+
 function javaManifest(state = {}, action) {
   switch (action.type) {
     case ActionTypes.UPDATE_JAVA_MANIFEST:
@@ -109,6 +118,7 @@ export default combineReducers({
   fabricManifest,
   javaManifest,
   curseforgeCategories,
+  optifineManifest,
   clientToken,
   isNewUser,
   showChangelogs

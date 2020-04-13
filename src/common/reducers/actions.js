@@ -30,6 +30,7 @@ import {
   GDL_LEGACYJAVAFIXER_MOD_URL,
   FORGE,
   FABRIC,
+  VANILLA,
   FMLLIBS_OUR_BASE_URL,
   FMLLIBS_FORGE_BASE_URL
 } from '../utils/constants';
@@ -695,7 +696,13 @@ export function updateInstanceConfig(
   };
 }
 
-export function addToQueue(instanceName, modloader, manifest, background) {
+export function addToQueue(
+  instanceName,
+  modloader,
+  manifest,
+  background,
+  optifine
+) {
   return async (dispatch, getState) => {
     const state = getState();
     const { currentDownload } = state;
@@ -704,7 +711,8 @@ export function addToQueue(instanceName, modloader, manifest, background) {
       instanceName,
       modloader,
       manifest,
-      background
+      background,
+      optifine
     });
     await makeDir(path.join(_getInstancesPath(state), instanceName));
     lockfile.lock(
@@ -723,7 +731,9 @@ export function addToQueue(instanceName, modloader, manifest, background) {
           modloader,
           timePlayed: prev.timePlayed || 0,
           background,
-          ...(addMods && { mods: [] })
+          ...(addMods && { mods: [] }),
+          ...((optifine && modloader[0] === VANILLA && { optifine }) ||
+            (modloader[0] === FORGE && { optifine }))
         }),
         true
       )

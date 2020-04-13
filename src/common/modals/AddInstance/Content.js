@@ -22,16 +22,19 @@ const Content = ({
   version,
   setModpack,
   importZipPath,
-  setImportZipPath
+  setImportZipPath,
+  setOptifineVersion,
+  optifineVersion
 }) => {
   const [overrideNextStepOnClick, setOverrideNextStepOnClick] = useState(null);
   const [loading, setLoading] = useState(false);
   let pages = [
-    <NewInstance setVersion={setVersion} setModpack={setModpack} />,
-    <TwitchModpacks
+    <NewInstance
       setVersion={setVersion}
-      setStep={setStep}
+      // version={version}
       setModpack={setModpack}
+      setOptifineVersion={setOptifineVersion}
+      optifineVersion={optifineVersion}
     />,
     <Import
       setVersion={setVersion}

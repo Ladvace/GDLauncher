@@ -160,48 +160,47 @@ export const librariesMapper = (libraries, librariesPath) => {
 export const parseOptifineVersions = html => {
   /* eslint-disable */
   const $ = cheerio.load(html.data);
-  // console.log(html.data);
   const minecraftVersionsList = [
-    ...Object.values($('table.downloads > tbody > tr> td').children())
+    ...Object.values($("table.downloads > tbody > tr> td").children())
   ];
   const hashMap = {};
-  const arr = [];
 
   for (const element of minecraftVersionsList) {
-    if (element.name === 'h2') {
-      hashMap[element.children[0].data.split(' ')[1]] = {};
+    if (element.name === "h2") {
+      hashMap[element.children[0].data.split(" ")[1]] = [];
 
-      Object.values($('table.downloadTable').children())
+      Object.values($("table.downloadTable").children())
         .slice(1)
         .filter(x => {
-          if (typeof x.children === 'object') {
+          if (typeof x.children === "object") {
             return (
               x.children
-                .filter(x => x.name === 'tr')[0]
-                .children[1].children[0].data.split(' ')[1] ===
-              element.children[0].data.split(' ')[1]
+                .filter(x => x.name === "tr")[0]
+                .children[1].children[0].data.split(" ")[1] ===
+              element.children[0].data.split(" ")[1]
             );
           }
         })[0]
-        .children.filter(x => x.name === 'tr')
+        .children.filter(x => x.name === "tr")
         .map(x => {
-          hashMap[element.children[0].data.split(' ')[1]][
-            x.children[1].children[0].data
-          ] = {
-            download: x.children[5].children[0].attribs.href,
-            changelog: x.children[7].children[0].attribs.href.includes(
-              'https://optifine.net'
-            )
-              ? x.children[7].children[0].attribs.href
-              : 'https://optifine.net/' +
-                x.children[7].children[0].attribs.href,
-            data: x.children[9].children[0].data
-          };
+          hashMap[element.children[0].data.split(" ")[1]] = [
+            ...hashMap[element.children[0].data.split(" ")[1]],
+            {
+              name: x.children[1].children[0].data,
+              download: x.children[5].children[0].attribs.href,
+              changelog: x.children[7].children[0].attribs.href.includes(
+                "https://optifine.net"
+              )
+                ? x.children[7].children[0].attribs.href
+                : "https://optifine.net/" +
+                  x.children[7].children[0].attribs.href,
+              data: x.children[9].children[0].data
+            }
+          ];
         });
-
-      console.log(hashMap);
     }
   }
+  return hashMap;
 };
 
 export const isLatestJavaDownloaded = async (meta, userData) => {

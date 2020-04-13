@@ -1,14 +1,142 @@
 /* eslint-disable */
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
-import { Cascader } from 'antd';
+import { Cascader, Checkbox, Select } from 'antd';
+import makeDir from 'make-dir';
+import path from 'path';
 import styled from 'styled-components';
 import { sortByForgeVersionDesc } from '../../utils';
+import axios from 'axios';
+import { downloadFile } from '../../../app/desktop/utils/downloader';
+import { _getOptifineVersionsPath } from '../../utils/selectors';
 
-const NewInstance = ({ setVersion, setModpack }) => {
+const NewInstance = ({
+  setVersion,
+  setModpack,
+  version,
+  setOptifineVersion,
+  optifineVersion
+}) => {
   const vanillaManifest = useSelector(state => state.app.vanillaManifest);
   const fabricManifest = useSelector(state => state.app.fabricManifest);
   const forgeManifest = useSelector(state => state.app.forgeManifest);
+  const optifineManifest = useSelector(state => state.app.optifineManifest);
+  const [minecraftVersion, setMinecraftVersion] = useState(null);
+  const [optifineSwitch, setOptifineSwitch] = useState(false);
+  const [optifineDefaultValue, setOptifineDefaultValue] = useState(null);
+
+  const optifineVersionsPath = useSelector(_getOptifineVersionsPath);
+
+  useEffect(() => {
+    console.log(
+      'SARA',
+      optifineDefaultValue,
+      optifineManifest,
+      minecraftVersion
+    );
+    if (
+      // optifineSwitch &&
+      minecraftVersion &&
+      minecraftVersion[0] === 'vanilla' &&
+      minecraftVersion[1] === 'release'
+    ) {
+      if (optifineManifest[minecraftVersion[2]]) {
+        setOptifineDefaultValue(optifineManifest[minecraftVersion[2]][0].name);
+        if (optifineSwitch) {
+          setOptifineVersion(optifineManifest[minecraftVersion[2]][0].name);
+        }
+      }
+    } else if (minecraftVersion && minecraftVersion[0] === 'forge') {
+      if (optifineManifest[minecraftVersion[1]]) {
+        setOptifineDefaultValue(optifineManifest[minecraftVersion[1]][0].name);
+        if (optifineSwitch) {
+          setOptifineVersion(optifineManifest[minecraftVersion[1]][0].name);
+        }
+      }
+    }
+  }, [minecraftVersion]);
+
+  useEffect(() => {
+    if (
+      minecraftVersion &&
+      minecraftVersion[0] === 'vanilla' &&
+      minecraftVersion[1] === 'release'
+    ) {
+      if (optifineManifest[minecraftVersion[2]]) {
+        setOptifineDefaultValue(optifineManifest[minecraftVersion[2]][0].name);
+        if (optifineSwitch) {
+          setOptifineVersion(optifineManifest[minecraftVersion[2]][0].name);
+        }
+      }
+    } else if (minecraftVersion && minecraftVersion[0] === 'forge') {
+      if (optifineManifest[minecraftVersion[1]]) {
+        setOptifineDefaultValue(optifineManifest[minecraftVersion[1]][0].name);
+        if (optifineSwitch) {
+          setOptifineVersion(optifineManifest[minecraftVersion[1]][0].name);
+        }
+      }
+    }
+  }, [optifineSwitch]);
+
+  // const downloadOptifine = async optifineVersionName => {
+  //   await makeDir(optifineVersionsPath);
+  //   const url = optifineManifest[optifineVersionName.split(" ")[1]].filter(
+  //     x => x.name === optifineVersionName
+  //   )[0].download;
+  //   const html = await axios.get(url);
+  //   const ret = /<a href='downloadx\?(.+?)'/.exec(html.data);
+  //   console.log(ret);
+  //   if (ret && ret[1]) {
+  //     downloadFile(
+  //       path.join(optifineVersionsPath, `${optifineVersionName}.jar`),
+  //       "https://optifine.net/downloadx?" + ret[1]
+  //     );
+  //   }
+  // };
+
+  const optifDefaultValue = () => {
+    if (minecraftVersion) {
+      if (minecraftVersion[0] === 'vanilla') {
+        if (optifineDefaultValue && optifineManifest[minecraftVersion[2]]) {
+          return optifineDefaultValue;
+        } else 'No optifine available for this version';
+      } else if (minecraftVersion[0] === 'forge') {
+        if (optifineDefaultValue && optifineManifest[minecraftVersion[1]]) {
+          return optifineDefaultValue;
+        } else 'No optifine available for this version';
+      }
+    }
+  };
+
+  const filterOptifineVersione = () => {
+    if (
+      minecraftVersion &&
+      minecraftVersion[0] === 'vanilla' &&
+      minecraftVersion[1] === 'release'
+    ) {
+      if (optifineManifest[minecraftVersion[2]]) {
+        return optifineManifest[minecraftVersion[2]].map(x => {
+          return (
+            <Option key={x.name} value={x.name}>
+              {x.name}
+            </Option>
+          );
+        });
+      }
+    } else if (minecraftVersion && minecraftVersion[0] === 'forge') {
+      if (optifineManifest[minecraftVersion[1]]) {
+        return optifineManifest[minecraftVersion[1]].map(x => {
+          return (
+            <Option key={x.name} value={x.name}>
+              {x.name}
+            </Option>
+          );
+        });
+      }
+    }
+  };
+
+  const { Option } = Select;
 
   const filteredVersions = useMemo(() => {
     const snapshots = vanillaManifest.versions
@@ -69,7 +197,7 @@ const NewInstance = ({ setVersion, setModpack }) => {
           label: k,
           children: v.sort(sortByForgeVersionDesc).map(child => ({
             value: child,
-            label: child.split('-')[1]
+            label: child
           }))
         }))
       },
@@ -113,18 +241,70 @@ const NewInstance = ({ setVersion, setModpack }) => {
 
   return (
     <Container>
-      <Cascader
-        options={filteredVersions}
-        onChange={v => {
-          setVersion(v);
-          setModpack(null);
-        }}
-        placeholder="Select a version"
-        size="large"
+      <div
         css={`
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
           width: 400px;
         `}
-      />
+      >
+        <Cascader
+          options={filteredVersions}
+          onChange={v => {
+            setVersion(v);
+            setMinecraftVersion(v);
+            console.log('OK', v);
+            setModpack(null);
+          }}
+          placeholder="Select a version"
+          size="large"
+          css={`
+            && {
+              width: 400px;
+            }
+          `}
+        />
+        <div
+          css={`
+            margin-top: 30px;
+            display: flex;
+            flex-direction: row;
+            justify-content: space-between;
+            align-items: center;
+          `}
+        >
+          <Checkbox
+            value={optifineSwitch}
+            onChange={e => setOptifineSwitch(e.target.checked)}
+          />
+          {optifineSwitch && (
+            <Select
+              onChange={v => {
+                // downloadOptifine(v);
+                if (!v) {
+                  setOptifineVersion(optifineDefaultValue);
+                } else setOptifineVersion(v);
+                console.log('version', v, optifineDefaultValue);
+              }}
+              value={optifDefaultValue()}
+              // optifineDefaultValue && optifineManifest[minecraftVersion[2]]
+              // ? optifineDefaultValue
+              // : "No optifine available for this version"
+
+              placeholder="Select an optifine version"
+              size="large"
+              css={`
+                && {
+                  width: 200px;
+                }
+              `}
+            >
+              {filterOptifineVersione()}
+            </Select>
+          )}
+        </div>
+      </div>
     </Container>
   );
 };

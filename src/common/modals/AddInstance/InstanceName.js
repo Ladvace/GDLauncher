@@ -32,7 +32,8 @@ const InstanceName = ({
   setVersion,
   setModpack,
   importZipPath,
-  step
+  step,
+  optifineVersion
 }) => {
   const mcName = (
     modpack?.name.replace(/\W/g, ' ') ||
@@ -151,7 +152,15 @@ const InstanceName = ({
       ];
       dispatch(addToQueue(localInstanceName, modloader, manifest));
     } else if (isVanilla) {
-      dispatch(addToQueue(localInstanceName, [version[0], version[2]]));
+      dispatch(
+        addToQueue(
+          localInstanceName,
+          [version[0], version[2]],
+          null,
+          null,
+          optifineVersion
+        )
+      );
       await wait(2);
     } else if (isFabric) {
       const mappedItem = fabricManifest.mappings.find(
@@ -168,7 +177,9 @@ const InstanceName = ({
       );
       await wait(2);
     } else if (isForge) {
-      dispatch(addToQueue(localInstanceName, version));
+      dispatch(
+        addToQueue(localInstanceName, version, null, null, optifineVersion)
+      );
       await wait(2);
     }
     dispatch(closeModal());
