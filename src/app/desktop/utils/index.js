@@ -161,38 +161,38 @@ export const parseOptifineVersions = html => {
   /* eslint-disable */
   const $ = cheerio.load(html.data);
   const minecraftVersionsList = [
-    ...Object.values($("table.downloads > tbody > tr> td").children())
+    ...Object.values($('table.downloads > tbody > tr> td').children())
   ];
   const hashMap = {};
 
   for (const element of minecraftVersionsList) {
-    if (element.name === "h2") {
-      hashMap[element.children[0].data.split(" ")[1]] = [];
+    if (element.name === 'h2') {
+      hashMap[element.children[0].data.split(' ')[1]] = [];
 
-      Object.values($("table.downloadTable").children())
+      Object.values($('table.downloadTable').children())
         .slice(1)
         .filter(x => {
-          if (typeof x.children === "object") {
+          if (typeof x.children === 'object') {
             return (
               x.children
-                .filter(x => x.name === "tr")[0]
-                .children[1].children[0].data.split(" ")[1] ===
-              element.children[0].data.split(" ")[1]
+                .filter(x => x.name === 'tr')[0]
+                .children[1].children[0].data.split(' ')[1] ===
+              element.children[0].data.split(' ')[1]
             );
           }
         })[0]
-        .children.filter(x => x.name === "tr")
+        .children.filter(x => x.name === 'tr')
         .map(x => {
-          hashMap[element.children[0].data.split(" ")[1]] = [
-            ...hashMap[element.children[0].data.split(" ")[1]],
+          hashMap[element.children[0].data.split(' ')[1]] = [
+            ...hashMap[element.children[0].data.split(' ')[1]],
             {
               name: x.children[1].children[0].data,
               download: x.children[5].children[0].attribs.href,
               changelog: x.children[7].children[0].attribs.href.includes(
-                "https://optifine.net"
+                'https://optifine.net'
               )
                 ? x.children[7].children[0].attribs.href
-                : "https://optifine.net/" +
+                : 'https://optifine.net/' +
                   x.children[7].children[0].attribs.href,
               data: x.children[9].children[0].data
             }
@@ -317,6 +317,13 @@ export const copyAssetsToLegacy = async assets => {
 };
 
 const hiddenToken = '__HIDDEN_TOKEN__';
+
+export const optifineArgs = (modloader, optifine) => {
+  if (modloader[0] === 'vanilla' && optifine) {
+    return ' --tweakClass optifine.OptiFineTweaker';
+  } else return '';
+};
+
 export const getJVMArguments112 = (
   libraries,
   mcjar,
@@ -325,6 +332,8 @@ export const getJVMArguments112 = (
   mcJson,
   account,
   memory,
+  optifineVersion,
+  modloader,
   hideAccessToken,
   jvmOptions = []
 ) => {
@@ -349,7 +358,9 @@ export const getJVMArguments112 = (
   args.push(`-Djava.library.path="${path.join(instancePath, 'natives')}"`);
   args.push(`-Dminecraft.applet.TargetDirectory="${instancePath}"`);
 
-  args.push(mcJson.mainClass);
+  if (optifineVersion && modloader[0] === 'vanilla') {
+    args.push('net.minecraft.launchwrapper.Launch');
+  } else args.push(mcJson.mainClass);
 
   const mcArgs = mcJson.minecraftArguments.split(' ');
   const argDiscovery = /\${*(.*)}/;
@@ -404,6 +415,10 @@ export const getJVMArguments112 = (
     }
   }
 
+  console.log('TT', optifineArgs(modloader, optifineVersion));
+
+  args.push(optifineArgs(modloader, optifineVersion));
+
   args.push(...mcArgs);
 
   return args;
@@ -417,6 +432,8 @@ export const getJVMArguments113 = (
   mcJson,
   account,
   memory,
+  optifineVersion,
+  modloader,
   hideAccessToken,
   jvmOptions = []
 ) => {
@@ -428,12 +445,17 @@ export const getJVMArguments113 = (
   //   args.push("-Xdock:icon=instanceicon");
   // }
 
+  // args.push(`"${path.join(optifineVersionsPath, `${optifineName}.jar`)}"`);
+  // args.push("C:\\Users\\Gianmarco\\AppData\\Roaming\\gdlauncher\\datastore\\libraries\\net\\optifine");
+
   args.push(`-Xmx${memory}m`);
   args.push(`-Xms${memory}m`);
   args.push(`-Dminecraft.applet.TargetDirectory="${instancePath}"`);
   args.push(...jvmOptions);
-
-  args.push(mcJson.mainClass);
+// 
+  if (optifineVersion && modloader[0] === 'vanilla') {
+    args.push('net.minecraft.launchwrapper.Launch');
+  } else args.push(mcJson.mainClass);
 
   args.push(...mcJson.arguments.game.filter(v => !skipLibrary(v)));
 
@@ -510,6 +532,8 @@ export const getJVMArguments113 = (
       }
     }
   }
+  console.log('TTT', optifineArgs(modloader, optifineVersion));
+  args.push(optifineArgs(modloader, optifineVersion));
 
   args = args.filter(arg => {
     return arg != null;
