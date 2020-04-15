@@ -49,6 +49,7 @@ import {
   getAddonFiles,
   getAddon,
   getAddonCategories,
+  getJavaManifestFromMirror,
   getOptifineHomePage
 } from '../api';
 import {
@@ -116,13 +117,6 @@ const getOptifine = instanceName => {
       )[0].download;
       const html = await axios.get(url);
       const ret = /<a href='downloadx\?(.+?)'/.exec(html.data);
-      console.log(
-        'CORBELLERIE',
-        url,
-        html,
-        ret,
-        path.join(optifineVersionsPath, `${optifineVersionName}.jar`)
-      );
       if (ret && ret[1]) {
         return {
           url: `https://optifine.net/downloadx?${ret[1]}`,
@@ -156,12 +150,21 @@ export function initManifests() {
       return fabric;
     };
     const getJavaManifestVersions = async () => {
-      const java = (await getJavaManifest()).data;
-      dispatch({
-        type: ActionTypes.UPDATE_JAVA_MANIFEST,
-        data: java
-      });
-      return java;
+      try {
+        const java = (await getJavaManifest()).data;
+        dispatch({
+          type: ActionTypes.UPDATE_JAVA_MANIFEST,
+          data: java
+        });
+        return java;
+      } catch {
+        const java = (await getJavaManifestFromMirror()).data;
+        dispatch({
+          type: ActionTypes.UPDATE_JAVA_MANIFEST,
+          data: java
+        });
+        return java;
+      }
     };
     const getAddonCategoriesVersions = async () => {
       const curseforgeCategories = (await getAddonCategories()).data;
@@ -423,14 +426,18 @@ export function loginWithAccessToken(redirect = true) {
     if (!accessToken) throw new Error();
     try {
       await mcValidate(accessToken, clientToken);
-      const skinUrl = await getPlayerSkin(selectedProfile.id);
-      if (skinUrl) {
-        dispatch(
-          updateAccount(selectedProfile.id, {
-            ...currentAccount,
-            skin: skinUrl
-          })
-        );
+      try {
+        const skinUrl = await getPlayerSkin(selectedProfile.id);
+        if (skinUrl) {
+          dispatch(
+            updateAccount(selectedProfile.id, {
+              ...currentAccount,
+              skin: skinUrl
+            })
+          );
+        }
+      } catch (err) {
+        console.warn('Could not fetch skin');
       }
       dispatch(push('/home'));
     } catch (error) {
@@ -1807,7 +1814,7 @@ export function launchInstance(instanceName) {
     const librariesPath = _getLibrariesPath(state);
     const assetsPath = _getAssetsPath(state);
     const { memory, args } = state.settings.java;
-    const { modloader, javaArgs, javaMemory } = _getInstance(state)(
+    const { modloader, javaArgs, javaMemory, optifine } = _getInstance(state)(
       instanceName
     );
     const instancePath = path.join(_getInstancesPath(state), instanceName);
@@ -1829,7 +1836,11 @@ export function launchInstance(instanceName) {
       path: path.join(_getMinecraftVersionsPath(state), `${mcJson.id}.jar`)
     };
 
-    if (modloader && modloader[0] === 'fabric') {
+    if (modloader && modloader[0] === 'vanilla') {
+      mcMainFile = {
+        path: path.join(_getMinecraftVersionsPath(state), `${optifine}.jar`)
+      };
+    } else if (modloader && modloader[0] === 'fabric') {
       const fabricJsonPath = path.join(
         _getLibrariesPath(state),
         'net',
@@ -1852,8 +1863,8 @@ export function launchInstance(instanceName) {
           Number.parseInt(ver.split('.')[ver.split('.').length - 1], 10);
 
         if (
-          lt(coerce(modloader[2]), coerce('10.13.1')) &&
-          gte(coerce(modloader[2]), coerce('9.11.1')) &&
+          lt(coerce(modloader[2].split('-')[1]), coerce('10.13.1')) &&
+          gte(coerce(modloader[2].split('-')[1]), coerce('9.11.1')) &&
           getForgeLastVer(modloader[2]) < 1217 &&
           getForgeLastVer(modloader[2]) > 935
         ) {
@@ -1908,6 +1919,12 @@ export function launchInstance(instanceName) {
       'url'
     );
 
+    const optifineVersionNameFixedFormat =
+      optifine &&
+      `${optifine.split(' ')[1]}-Optifine_${
+        optifine.split(' ')[2]
+      }_${optifine.split(' ').slice(3, 5).join('_')}`;
+
     const getJvmArguments =
       mcJson.assets !== 'legacy' && gte(coerce(mcJson.assets), coerce('1.13'))
         ? getJVMArguments113
@@ -1916,6 +1933,7 @@ export function launchInstance(instanceName) {
     const javaArguments = (javaArgs !== undefined ? javaArgs : args).split(' ');
     const javaMem = javaMemory !== undefined ? javaMemory : memory;
 
+    console.log('PPPP', optifine);
     const jvmArguments = getJvmArguments(
       libraries,
       mcMainFile,
@@ -1924,6 +1942,8 @@ export function launchInstance(instanceName) {
       mcJson,
       account,
       javaMem,
+      optifineVersionNameFixedFormat,
+      modloader,
       false,
       javaArguments
     );
@@ -1948,6 +1968,8 @@ export function launchInstance(instanceName) {
         mcJson,
         account,
         javaMem,
+        optifineVersionNameFixedFormat,
+        modloader,
         true,
         javaArguments
       ).join(' ')}`.replace(...replaceRegex)

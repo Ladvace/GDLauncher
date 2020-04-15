@@ -35,7 +35,7 @@ const NewInstance = ({
       minecraftVersion
     );
     if (
-      // optifineSwitch &&
+      optifineSwitch &&
       minecraftVersion &&
       minecraftVersion[0] === 'vanilla' &&
       minecraftVersion[1] === 'release'
