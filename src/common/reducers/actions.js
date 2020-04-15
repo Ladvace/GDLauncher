@@ -49,6 +49,7 @@ import {
   getAddonFiles,
   getAddon,
   getAddonCategories,
+  getJavaManifestFromMirror,
   getOptifineHomePage
 } from '../api';
 import {
@@ -156,12 +157,21 @@ export function initManifests() {
       return fabric;
     };
     const getJavaManifestVersions = async () => {
-      const java = (await getJavaManifest()).data;
-      dispatch({
-        type: ActionTypes.UPDATE_JAVA_MANIFEST,
-        data: java
-      });
-      return java;
+      try {
+        const java = (await getJavaManifest()).data;
+        dispatch({
+          type: ActionTypes.UPDATE_JAVA_MANIFEST,
+          data: java
+        });
+        return java;
+      } catch {
+        const java = (await getJavaManifestFromMirror()).data;
+        dispatch({
+          type: ActionTypes.UPDATE_JAVA_MANIFEST,
+          data: java
+        });
+        return java;
+      }
     };
     const getAddonCategoriesVersions = async () => {
       const curseforgeCategories = (await getAddonCategories()).data;
@@ -423,14 +433,18 @@ export function loginWithAccessToken(redirect = true) {
     if (!accessToken) throw new Error();
     try {
       await mcValidate(accessToken, clientToken);
-      const skinUrl = await getPlayerSkin(selectedProfile.id);
-      if (skinUrl) {
-        dispatch(
-          updateAccount(selectedProfile.id, {
-            ...currentAccount,
-            skin: skinUrl
-          })
-        );
+      try {
+        const skinUrl = await getPlayerSkin(selectedProfile.id);
+        if (skinUrl) {
+          dispatch(
+            updateAccount(selectedProfile.id, {
+              ...currentAccount,
+              skin: skinUrl
+            })
+          );
+        }
+      } catch (err) {
+        console.warn('Could not fetch skin');
       }
       dispatch(push('/home'));
     } catch (error) {
@@ -858,9 +872,7 @@ export function downloadForge(instanceName) {
       if (fileMd5.toString() !== expectedMd5) {
         throw new Error('Installer hash mismatch');
       }
-      if (!pre152) {
-        await fse.copy(expectedInstaller, tempInstaller, { overwrite: true });
-      }
+      await fse.copy(expectedInstaller, tempInstaller, { overwrite: true });
     } catch (err) {
       console.warn(
         'No installer found in temp or hash mismatch. Need to download it.'
@@ -1022,7 +1034,6 @@ export function downloadForge(instanceName) {
         async lib => {
           let ok = false;
           let tries = 0;
-          /* eslint-disable no-await-in-loop */
           do {
             tries += 1;
             if (tries !== 1) {
@@ -1049,7 +1060,6 @@ export function downloadForge(instanceName) {
               console.error(err);
             }
           } while (!ok && tries <= 3);
-          /* eslint-enable no-await-in-loop */
         },
         { concurrency: state.settings.concurrentDownloads }
       );
@@ -1089,14 +1099,10 @@ export function downloadForge(instanceName) {
         path.join(_getTempPath(state), modloader[2]),
         {
           $bin: sevenZipPath,
-          yes: true,
-          $progress: true
+          yes: true
         }
       );
       await new Promise((resolve, reject) => {
-        extraction.on('progress', ({ percent }) => {
-          dispatch(updateDownloadProgress(percent / 2));
-        });
         extraction.on('end', () => {
           resolve();
         });
@@ -1105,19 +1111,17 @@ export function downloadForge(instanceName) {
         });
       });
 
+      dispatch(updateDownloadProgress(50));
+
       const updatedFiles = Seven.add(
         mcJarForgePath,
         `${path.join(_getTempPath(state), modloader[2])}/*`,
         {
           $bin: sevenZipPath,
-          yes: true,
-          $progress: true
+          yes: true
         }
       );
       await new Promise((resolve, reject) => {
-        updatedFiles.on('progress', ({ percent }) => {
-          dispatch(updateDownloadProgress(50 + percent / 2));
-        });
         updatedFiles.on('end', () => {
           resolve();
         });
@@ -1862,8 +1866,8 @@ export function launchInstance(instanceName) {
           Number.parseInt(ver.split('.')[ver.split('.').length - 1], 10);
 
         if (
-          lt(coerce(modloader[2]), coerce('10.13.1')) &&
-          gte(coerce(modloader[2]), coerce('9.11.1')) &&
+          lt(coerce(modloader[2].split('-')[1]), coerce('10.13.1')) &&
+          gte(coerce(modloader[2].split('-')[1]), coerce('9.11.1')) &&
           getForgeLastVer(modloader[2]) < 1217 &&
           getForgeLastVer(modloader[2]) > 935
         ) {
