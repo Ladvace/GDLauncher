@@ -86,6 +86,7 @@ import {
   filterForgeFilesByVersion,
   filterFabricFilesByVersion,
   getPatchedInstanceType,
+  convertCompletePathToInstance,
   parseOptifineVersions
 } from '../../app/desktop/utils';
 import {
@@ -1690,16 +1691,20 @@ export const startListener = () => {
             action === 1 &&
             completed
           ) {
-            const instanceName = fileName
-              .replace(instancesPath, '')
+            const instanceName = convertCompletePathToInstance(
+              fileName,
+              instancesPath
+            )
               .substr(1)
               .split(path.sep)[0];
             // Check if we can find any other action with this instance name
             Object.entries(changesTracker).forEach(
               ([file, { action: act }]) => {
                 if (isMod(file, instancesPath) && act === 1) {
-                  const instName = file
-                    .replace(instancesPath, '')
+                  const instName = convertCompletePathToInstance(
+                    file,
+                    instancesPath
+                  )
                     .substr(1)
                     .split(path.sep)[0];
                   if (instanceName === instName) {
@@ -1723,8 +1728,10 @@ export const startListener = () => {
             delete changesTracker[fileName];
 
             // Infer the instance name from the full path
-            const instanceName = filePath
-              .replace(instancesPath, '')
+            const instanceName = convertCompletePathToInstance(
+              filePath,
+              instancesPath
+            )
               .substr(1)
               .split(path.sep)[0];
 
@@ -1756,8 +1763,10 @@ export const startListener = () => {
               !isInstanceFolderPath(newFilePath, instancesPath)
             ) {
               // Infer the instance name from the full path
-              const oldInstanceName = fileName
-                .replace(instancesPath, '')
+              const oldInstanceName = convertCompletePathToInstance(
+                fileName,
+                instancesPath
+              )
                 .substr(1)
                 .split(path.sep)[0];
               if (
@@ -1790,8 +1799,10 @@ export const startListener = () => {
               } else if (action === 1) {
                 processRemovedInstance(instanceName);
               } else if (action === 3) {
-                const oldInstanceName = fileName
-                  .replace(instancesPath, '')
+                const oldInstanceName = convertCompletePathToInstance(
+                  fileName,
+                  instancesPath
+                )
                   .substr(1)
                   .split(path.sep)[0];
                 processRenamedInstance(oldInstanceName, instanceName);
