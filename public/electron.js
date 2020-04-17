@@ -40,10 +40,14 @@ Menu.setApplicationMenu();
 if (process.env.REACT_APP_RELEASE_TYPE === 'portable') {
   app.setPath('userData', path.join(path.dirname(app.getPath('exe')), 'data'));
 } else {
-  // this defaults to app.getPath('userData'), which is fine since we only use it for setup
   const store = new Store({ name: 'overrides' });
   if (store.has('userDataOverride')) {
     app.setPath('userData', store.get('userDataOverride'));
+  } else {
+    app.setPath(
+      'userData',
+      path.join(app.getPath('appData'), 'gdlauncher_next')
+    );
   }
 }
 
@@ -63,7 +67,7 @@ function createWindow() {
     minHeight: 700,
     show: true,
     frame: false,
-    backgroundColor: '#353E48',
+    backgroundColor: '#212B36',
     webPreferences: {
       experimentalFeatures: true,
       nodeIntegration: true,

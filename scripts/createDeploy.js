@@ -118,6 +118,12 @@ const createDeployFiles = async type => {
 
 const commonConfig = {
   config: {
+    publish: {
+      owner: 'gorilla-devs',
+      repo: 'GDLauncher-Releases',
+      provider: 'github',
+      private: false
+    },
     productName: 'GDLauncher',
     appId: 'org.gorilladevs.GDLauncher',
     files: [
@@ -140,7 +146,7 @@ const commonConfig = {
         }
       ]
     },
-    nsis: {
+    nsisWeb: {
       oneClick: false,
       installerIcon: './public/icon.ico',
       uninstallerIcon: './public/icon.ico',
@@ -149,8 +155,9 @@ const commonConfig = {
       installerHeaderIcon: './public/icon.ico',
       deleteAppDataOnUninstall: true,
       allowToChangeInstallationDirectory: true,
-      perMachine: false,
-      differentialPackage: true
+      perMachine: true,
+      differentialPackage: true,
+      include: './public/installer.nsh'
     },
     /* eslint-disable */
     artifactName: `${'${productName}'}-${'${platform}'}-${
@@ -161,7 +168,7 @@ const commonConfig = {
       target: ['dmg']
     },
     win: {
-      target: ['nsis', 'zip']
+      target: ['nsis-web', 'zip']
     },
     linux: {
       target: ['appImage', 'zip'],
@@ -171,8 +178,7 @@ const commonConfig = {
       buildResources: 'public',
       output: 'release'
     }
-  },
-  publish: 'never'
+  }
 };
 
 const main = async () => {
@@ -193,6 +199,11 @@ const main = async () => {
 
   const { productName } = commonConfig.config;
 
+  const { version } = await fse.readJson(
+    path.resolve(__dirname, '../', 'package.json')
+  );
+
+  const nsisWeb7z = `${productName}-${version}-${process.arch}.nsis.7z`;
   const nameTemplate = `${productName}-${process.platform}-${type}`;
 
   const allFiles = {
@@ -203,9 +214,9 @@ const main = async () => {
         'latest-mac.yml'
       ],
       win32: [
-        `${nameTemplate}.exe`,
-        `${nameTemplate}.exe.blockmap`,
-        'latest.yml'
+        path.join('nsis-web', `${nameTemplate}.exe`),
+        path.join('nsis-web', nsisWeb7z),
+        path.join('nsis-web', 'latest.yml')
       ],
       linux: [`${nameTemplate}.AppImage`, 'latest-linux.yml']
     },
@@ -224,7 +235,7 @@ const main = async () => {
       if (stats.isFile()) {
         await fse.move(
           path.join(releasesFolder, file),
-          path.join(deployFolder, file)
+          path.join(deployFolder, file.replace('nsis-web', ''))
         );
       }
     })
