@@ -1825,10 +1825,12 @@ export function launchInstance(instanceName) {
     const librariesPath = _getLibrariesPath(state);
     const assetsPath = _getAssetsPath(state);
     const { memory, args } = state.settings.java;
+    const optifineVersionsPath = _getOptifineVersionsPath(state);
     const { modloader, javaArgs, javaMemory, optifine } = _getInstance(state)(
       instanceName
     );
     const instancePath = path.join(_getInstancesPath(state), instanceName);
+    const sevenZipPath = await get7zPath();
 
     const instanceJLFPath = path.join(
       _getInstancesPath(state),
@@ -1836,6 +1838,7 @@ export function launchInstance(instanceName) {
       'mods',
       '__JLF__.jar'
     );
+    const tempFolder = _getTempPath(state);
 
     const mcJson = await fse.readJson(
       path.join(_getMinecraftVersionsPath(state), `${modloader[1]}.json`)
@@ -1847,10 +1850,64 @@ export function launchInstance(instanceName) {
       path: path.join(_getMinecraftVersionsPath(state), `${mcJson.id}.jar`)
     };
 
-    if (modloader && modloader[0] === 'vanilla') {
+    if (modloader && modloader[0] === 'vanilla' && optifine) {
       mcMainFile = {
         path: path.join(_getMinecraftVersionsPath(state), `${optifine}.jar`)
       };
+
+      // const tempFolder = _getTempPath(state);
+
+      const launchwrapperTxtPath = path.join(
+        tempFolder,
+        'launchwrapper-of.txt'
+      );
+
+      const version = await fse.readJSON(launchwrapperTxtPath);
+
+      const existLauncherWrapper = await fs.lstat(
+        path.join(
+          librariesPath,
+          'optifine',
+          'launchwrapper-of',
+          `launchwrapper-of-${version}.jar`
+        )
+      );
+
+      if (!existLauncherWrapper) {
+        // const launchwrapperTxtExtraction = extractFull(
+        //   path.join(optifineVersionsPath, `${optifine}.jar`),
+        //   tempFolder,
+        //   {
+        //     $bin: sevenZipPath,
+        //     $cherryPick: 'launchwrapper-of.txt'
+        //   }
+        // );
+      }
+
+      console.log('version', version);
+
+      console.log('ROBERT', optifine);
+      // const existOptifine = await fs.lstat(
+      //   path.join(optifineVersionsPath, `${config.optifine}.jar`)
+      // );
+
+      if (optifine) {
+        await makeDir(path.join(librariesPath, 'optifine'));
+
+        extractFull(
+          path.join(optifineVersionsPath, `${optifine}.jar`),
+          path.join(librariesPath, 'optifine', 'launchwrapper-of'),
+          {
+            $bin: sevenZipPath,
+            $cherryPick: '*.jar'
+          }
+        );
+
+        await fse.copy(
+          path.join(optifineVersionsPath, `${optifine}.jar`),
+          path.join(librariesPath, 'optifine', 'Optifine', `${optifine}.jar`)
+        );
+      }
     } else if (modloader && modloader[0] === 'fabric') {
       const fabricJsonPath = path.join(
         _getLibrariesPath(state),
@@ -1925,10 +1982,58 @@ export function launchInstance(instanceName) {
         };
       }
     }
+
     libraries = removeDuplicates(
       libraries.concat(librariesMapper(mcJson.libraries, librariesPath)),
       'url'
     );
+
+    const launchwrapperTxtPath = path.join(tempFolder, 'launchwrapper-of.txt');
+
+    const version = await fse.readJSON(launchwrapperTxtPath);
+
+    const existLauncherWrapper = await fs.lstat(
+      path.join(
+        librariesPath,
+        'optifine',
+        'launchwrapper-of',
+        `launchwrapper-of-${version}.jar`
+      )
+    );
+
+    if (!existLauncherWrapper) {
+      console.log('TETSIE');
+      extractFull(
+        path.join(optifineVersionsPath, `${optifine}.jar`),
+        tempFolder,
+        {
+          $bin: sevenZipPath,
+          $cherryPick: 'launchwrapper-of.txt'
+        }
+      );
+    }
+
+    if (optifine) {
+      const existOptifine = await fs.lstat(
+        path.join(optifineVersionsPath, `${optifine}.jar`)
+      );
+
+      if (existLauncherWrapper && existOptifine) {
+        libraries = libraries.concat(
+          {
+            path: path.join(
+              librariesPath,
+              'optifine',
+              'launchwrapper-of',
+              `launchwrapper-of-${version}.jar`
+            )
+          },
+          {
+            path: path.join(optifineVersionsPath, `${optifine}.jar`)
+          }
+        );
+      }
+    }
 
     const optifineVersionNameFixedFormat =
       optifine &&
@@ -2055,7 +2160,6 @@ export function installMod(
     if (useTempMiddleware) {
       await downloadFile(tempFile, mainModData.data.downloadUrl, onProgress);
     }
-
     let needToAddMod = true;
     await dispatch(
       updateInstanceConfig(instanceName, prev => {

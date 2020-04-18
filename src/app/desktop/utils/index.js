@@ -320,7 +320,7 @@ const hiddenToken = '__HIDDEN_TOKEN__';
 
 export const optifineArgs = (modloader, optifine) => {
   if (modloader[0] === 'vanilla' && optifine) {
-    return ' --tweakClass optifine.OptiFineTweaker';
+    return '--tweakClass optifine.OptiFineTweaker';
   } else return '';
 };
 
@@ -452,7 +452,7 @@ export const getJVMArguments113 = (
   args.push(`-Xms${memory}m`);
   args.push(`-Dminecraft.applet.TargetDirectory="${instancePath}"`);
   args.push(...jvmOptions);
-// 
+  //
   if (optifineVersion && modloader[0] === 'vanilla') {
     args.push('net.minecraft.launchwrapper.Launch');
   } else args.push(mcJson.mainClass);
@@ -532,7 +532,7 @@ export const getJVMArguments113 = (
       }
     }
   }
-  console.log('TTT', optifineArgs(modloader, optifineVersion));
+  console.log('TTT', optifineVersion, optifineArgs(modloader, optifineVersion));
   args.push(optifineArgs(modloader, optifineVersion));
 
   args = args.filter(arg => {
