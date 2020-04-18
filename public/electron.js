@@ -25,7 +25,6 @@ const gotTheLock = app.requestSingleInstanceLock();
 // Prevent multiple instances
 if (!gotTheLock) {
   app.quit();
-  app.exit();
 }
 
 // This gets rid of this: https://github.com/electron/electron/issues/13186
@@ -168,9 +167,19 @@ app.on('ready', createWindow);
 app.on('window-all-closed', () => {
   log.log('Quitting app (window-all-closed)');
   if (process.platform !== 'darwin') {
+    log.log('Quitting app (trying) (window-all-closed)');
     app.quit();
-    app.exit();
+    log.log('Quitting app (quit) (window-all-closed)');
   }
+});
+
+app.on('before-quit', async () => {
+  if (watcher) {
+    await watcher.stop();
+    watcher = null;
+  }
+  mainWindow.removeAllListeners('close');
+  mainWindow = null;
 });
 
 app.on('second-instance', () => {
