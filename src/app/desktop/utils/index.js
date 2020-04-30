@@ -332,6 +332,7 @@ export const getJVMArguments112 = (
   mcJson,
   account,
   memory,
+  resolution,
   optifineVersion,
   modloader,
   hideAccessToken,
@@ -358,6 +359,11 @@ export const getJVMArguments112 = (
   args.push(`-Djava.library.path="${path.join(instancePath, 'natives')}"`);
   args.push(`-Dminecraft.applet.TargetDirectory="${instancePath}"`);
 
+  args.push(mcJson.mainClass);
+  if (resolution) {
+    args.push(`--width ${resolution.width}`);
+    args.push(`--height ${resolution.height}`);
+  }
   if (optifineVersion && modloader[0] === 'vanilla') {
     args.push('net.minecraft.launchwrapper.Launch');
   } else args.push(mcJson.mainClass);
@@ -432,6 +438,7 @@ export const getJVMArguments113 = (
   mcJson,
   account,
   memory,
+  resolution,
   optifineVersion,
   modloader,
   hideAccessToken,
@@ -456,6 +463,13 @@ export const getJVMArguments113 = (
   if (optifineVersion && modloader[0] === 'vanilla') {
     args.push('net.minecraft.launchwrapper.Launch');
   } else args.push(mcJson.mainClass);
+
+  args.push(mcJson.mainClass);
+
+  if (resolution) {
+    args.push(`--width ${resolution.width}`);
+    args.push(`--height ${resolution.height}`);
+  }
 
   args.push(...mcJson.arguments.game.filter(v => !skipLibrary(v)));
 
