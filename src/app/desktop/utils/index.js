@@ -10,6 +10,7 @@ import { ipcRenderer } from 'electron';
 import path from 'path';
 import crypto from 'crypto';
 import cheerio from 'cheerio';
+import semVer from 'semver';
 import { exec, spawn } from 'child_process';
 import {
   MC_LIBRARIES_URL,
@@ -318,11 +319,12 @@ export const copyAssetsToLegacy = async assets => {
 
 const hiddenToken = '__HIDDEN_TOKEN__';
 
-export const optifineArgs = (modloader, optifine) => {
-  if (modloader[0] === 'vanilla' && optifine) {
-    return '--tweakClass optifine.OptiFineTweaker';
-  } else return '';
-};
+// export const optifineArgs = (modloader, optifine) => {
+//   if (modloader[0] === 'vanilla' && optifine) {
+
+//     return '--tweakClass optifine.OptiFineTweaker';
+//   } else return '';
+// };
 
 export const getJVMArguments112 = (
   libraries,
@@ -359,13 +361,17 @@ export const getJVMArguments112 = (
   args.push(`-Djava.library.path="${path.join(instancePath, 'natives')}"`);
   args.push(`-Dminecraft.applet.TargetDirectory="${instancePath}"`);
 
-  args.push(mcJson.mainClass);
   if (resolution) {
     args.push(`--width ${resolution.width}`);
     args.push(`--height ${resolution.height}`);
   }
   if (optifineVersion && modloader[0] === 'vanilla') {
-    args.push('net.minecraft.launchwrapper.Launch');
+    if (semVer.lt(modloader[1], '1.8.9')) {
+      args.push(mcJson.mainClass);
+    } else {
+      args.push(' net.minecraft.launchwrapper.Launch ');
+    }
+    args.push('--tweakClass optifine.OptiFineTweaker');
   } else args.push(mcJson.mainClass);
 
   const mcArgs = mcJson.minecraftArguments.split(' ');
@@ -421,13 +427,56 @@ export const getJVMArguments112 = (
     }
   }
 
-  console.log('TT', optifineArgs(modloader, optifineVersion));
-
-  args.push(optifineArgs(modloader, optifineVersion));
 
   args.push(...mcArgs);
 
   return args;
+};
+
+export const patchOptifine = async (
+  javaPath,
+  optifineInstallerJar,
+  minecraftJar,
+  outputOptifineLibJar
+) => {
+  console.log(`Patching Optfine Library: "${javaPath}"`, [
+    '-cp',
+    `"${optifineInstallerJar}"`,
+    'optifine.Patcher',
+    `"${minecraftJar}"`,
+    `"${optifineInstallerJar}"`,
+    `"${outputOptifineLibJar}"`
+  ]);
+  await new Promise(resolve => {
+    const ps = spawn(
+      `"${javaPath}"`,
+      [
+        '-cp',
+        `"${optifineInstallerJar}"`,
+        'optifine.Patcher',
+        `"${minecraftJar}"`,
+        `"${optifineInstallerJar}"`,
+        `"${outputOptifineLibJar}"`
+      ],
+      { shell: true }
+    );
+
+    ps.stdout.on('data', data => {
+      console.log(data.toString());
+    });
+
+    ps.stderr.on('data', data => {
+      console.error(`ps stderr: ${data}`);
+    });
+
+    ps.on('close', code => {
+      if (code !== 0) {
+        console.log(`process exited with code ${code}`);
+        resolve();
+      }
+      resolve();
+    });
+  });
 };
 
 export const getJVMArguments113 = (
@@ -462,6 +511,7 @@ export const getJVMArguments113 = (
   //
   if (optifineVersion && modloader[0] === 'vanilla') {
     args.push('net.minecraft.launchwrapper.Launch');
+    args.push("--tweakClass optifine.OptiFineTweaker");
   } else args.push(mcJson.mainClass);
 
   args.push(mcJson.mainClass);
@@ -546,8 +596,6 @@ export const getJVMArguments113 = (
       }
     }
   }
-  console.log('TTT', optifineVersion, optifineArgs(modloader, optifineVersion));
-  args.push(optifineArgs(modloader, optifineVersion));
 
   args = args.filter(arg => {
     return arg != null;
