@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, memo } from 'react';
 import { transparentize } from 'polished';
 import styled, { keyframes } from 'styled-components';
 import { promises as fs } from 'fs';
@@ -12,7 +12,8 @@ import {
   faWrench,
   faFolder,
   faTrash,
-  faStop
+  faStop,
+  faBoxOpen
 } from '@fortawesome/free-solid-svg-icons';
 import psTree from 'ps-tree';
 import { ContextMenuTrigger, ContextMenu, MenuItem } from 'react-contextmenu';
@@ -25,6 +26,7 @@ import {
 import { launchInstance } from '../../../../common/reducers/actions';
 import { openModal } from '../../../../common/reducers/modals/actions';
 import instanceDefaultBackground from '../../../../common/assets/instance_default.png';
+import { convertMinutesToHumanTime } from '../../../../common/utils';
 
 const Container = styled.div`
   position: relative;
@@ -139,7 +141,7 @@ const TimePlayed = styled.div`
 `;
 
 const MenuInstanceName = styled.div`
-  background: ${props => props.theme.palette.grey[900]};
+  background: ${props => props.theme.palette.grey[800]};
   height: 40px;
   display: flex;
   justify-content: center;
@@ -162,28 +164,6 @@ const Instance = ({ instanceName }) => {
   const isInQueue = downloadQueue[instanceName];
 
   const isPlaying = startedInstances[instanceName];
-
-  const calcTime = minutes => {
-    const days = Math.floor(minutes / 1440); // 60*24
-    const hours = Math.floor((minutes - days * 1440) / 60);
-    const min = Math.round(minutes % 60);
-    const weeks = Math.floor(days / 7);
-    const months = Math.floor(weeks / 4);
-
-    if (days < 7) {
-      if (days > 0) {
-        return `${days} d, ${hours} h, ${min} m`;
-      }
-      if (hours > 0) {
-        return `${hours} h, ${min} m`;
-      }
-      return `${min} minutes`;
-    }
-    if (months > 0) {
-      return `${months} months`;
-    }
-    return `${weeks} weeks`;
-  };
 
   useEffect(() => {
     if (instance.background) {
@@ -209,6 +189,9 @@ const Instance = ({ instanceName }) => {
   };
   const manageInstance = () => {
     dispatch(openModal('InstanceManager', { instanceName }));
+  };
+  const instanceExportCurseForge = () => {
+    dispatch(openModal('InstanceExportCurseForge', { instanceName }));
   };
   const killProcess = () => {
     console.log(isPlaying.pid);
@@ -240,7 +223,7 @@ const Instance = ({ instanceName }) => {
                 `}
               />
 
-              {calcTime(instance.timePlayed)}
+              {convertMinutesToHumanTime(instance.timePlayed)}
             </TimePlayed>
             <MCVersion>{(instance.modloader || [])[1]}</MCVersion>
             {instanceName}
@@ -336,6 +319,20 @@ const Instance = ({ instanceName }) => {
           />
           Open Folder
         </MenuItem>
+
+        {/* // TODO - Support other export options besides curseforge forge. */}
+        <MenuItem
+          onClick={instanceExportCurseForge}
+          disabled={Boolean(isInQueue) || instance.modloader[0] !== 'forge'}
+        >
+          <FontAwesomeIcon
+            icon={faBoxOpen}
+            css={`
+              margin-right: 10px;
+            `}
+          />
+          Export Pack
+        </MenuItem>
         <MenuItem divider />
         <MenuItem
           disabled={Boolean(isInQueue) || Boolean(isPlaying)}
@@ -354,4 +351,4 @@ const Instance = ({ instanceName }) => {
   );
 };
 
-export default Instance;
+export default memo(Instance);

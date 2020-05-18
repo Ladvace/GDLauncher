@@ -53,11 +53,25 @@ const modalsComponentLookupTable = {
   InstanceManager: AsyncComponent(
     lazy(() => import('../modals/InstanceManager'))
   ),
+  InstanceExportCurseForge: AsyncComponent(
+    lazy(() => import('../modals/InstanceExport/CurseForge'))
+  ),
+  AutoUpdatesNotAvailable: AsyncComponent(
+    lazy(() => import('../modals/AutoUpdatesNotAvailable'))
+  ),
+  BisectHosting: AsyncComponent(lazy(() => import('../modals/BisectHosting'))),
   Onboarding: AsyncComponent(lazy(() => import('../modals/Onboarding'))),
   ModOverview: AsyncComponent(lazy(() => import('../modals/ModOverview'))),
   ModsBrowser: AsyncComponent(lazy(() => import('../modals/ModsBrowser'))),
   JavaSetup: AsyncComponent(lazy(() => import('../modals/JavaSetup'))),
-  ModsUpdater: AsyncComponent(lazy(() => import('../modals/ModsUpdater')))
+  ModsUpdater: AsyncComponent(lazy(() => import('../modals/ModsUpdater'))),
+  InstanceCrashed: AsyncComponent(
+    lazy(() => import('../modals/InstanceCrashed'))
+  ),
+  ChangeLogs: AsyncComponent(lazy(() => import('../modals/ChangeLogs'))),
+  InstancesMigration: AsyncComponent(
+    lazy(() => import('../modals/InstancesMigration'))
+  )
 };
 
 const ModalContainer = ({ unmounting, children, preventClose, modalType }) => {

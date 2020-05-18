@@ -1,36 +1,8 @@
 import { createGlobalStyle } from 'styled-components';
 
-const FFMarkW05MedWoff2 =
-  'https://lolstatic-a.akamaihd.net/rso-login-page/2.2.20/assets/FFMarkW05-Medium.662fbc7901e31d6bee9c91d5f2cf42a1.woff2';
-const FFMarkW05BoldWoff2 =
-  'https://lolstatic-a.akamaihd.net/rso-login-page/2.2.20/assets/FFMarkW05-Bold.8e5368c00aa72d1e1b19d7b437c375f4.woff2';
-const FFMarkW05HeavyWoff2 =
-  'https://lolstatic-a.akamaihd.net/rso-login-page/2.2.20/assets/FFMarkW05-Heavy.1de8fa6eb6e45628ebb3edd635462180.woff2';
-
 export default createGlobalStyle`
   html {
     height: 100%;
-  }
-
-  @font-face {
-    font-family: "FF Mark W05";
-    src: url(${FFMarkW05MedWoff2}) format("woff2");
-    font-style: normal;
-    font-weight: 500;
-  }
-
-  @font-face {
-    font-family: "FF Mark W05";
-    src: url(${FFMarkW05BoldWoff2}) format("woff2");
-    font-style: normal;
-    font-weight: 700;
-  }
-  
-  @font-face {
-    font-family: "FF Mark W05";
-    src: url(${FFMarkW05HeavyWoff2}) format("woff2");
-    font-style: normal;
-    font-weight: 800;
   }
 
   body {
@@ -42,7 +14,7 @@ export default createGlobalStyle`
   }
   
   #root {
-    font-family: FF Mark W05, Roboto, Helvetica, sans-serif;
+    font-family: Inter, Roboto, Helvetica, sans-serif;
     font-size: 14px;
     height: 100%;
     overflow: hidden;
@@ -127,11 +99,11 @@ export default createGlobalStyle`
     box-shadow: 0 3px 6px rgba(0,0,0,0.16), 0 3px 6px rgba(0,0,0,0.23);
     text-align: center;
     transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-    transition: transform 100ms;
+    transition: transform 80ms;
   }
   
   .react-contextmenu.react-contextmenu--visible {
-    transition: transform 100ms;
+    transition: transform 80ms;
     transform: scale(1);
     pointer-events: auto;
     z-index: 9999;
@@ -153,12 +125,12 @@ export default createGlobalStyle`
   }
 
   .react-contextmenu-item:not(.react-contextmenu-item--divider):hover{
-    background: ${({ theme }) => theme.palette.grey[500]};
+    background: ${({ theme }) => theme.palette.grey[600]};
     text-decoration: none;
   }
 
   .react-contextmenu-item:not(.react-contextmenu-item--divider):active{
-    background: ${({ theme }) => theme.palette.grey[400]};
+    background: ${({ theme }) => theme.palette.grey[500]};
     text-decoration: none;
   }
 
@@ -173,7 +145,7 @@ export default createGlobalStyle`
   }
   
   .react-contextmenu-item--divider {
-    border-bottom: 1px solid ${props => props.theme.palette.grey[400]};
+    border-bottom: 1px solid ${props => props.theme.palette.grey[600]};
     cursor: inherit;
     margin-bottom: 3px;
     padding: 2px 0;

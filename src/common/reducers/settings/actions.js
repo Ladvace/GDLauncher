@@ -45,11 +45,11 @@ export function updatePotatoPcMode(value) {
   };
 }
 
-export function updateShowChangelog(show) {
+export function updateResolution(resolution) {
   return dispatch => {
     dispatch({
-      type: ActionTypes.UPDATE_SHOW_CHANGELOG,
-      show
+      type: ActionTypes.UPDATE_MINECRAFT_RESOLUTION,
+      resolution
     });
   };
 }

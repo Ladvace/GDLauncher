@@ -5,39 +5,44 @@ module.exports = {
       white: '#fff'
     },
     primary: {
-      light: '#6288a2',
-      main: '#406e8e',
-      dark: '#355b75'
+      light: '#5A7391',
+      main: '#365076',
+      dark: '#2B4066'
     },
     secondary: {
-      light: '#353E48',
-      main: '#212B36',
-      dark: '#1C242D'
+      light: '#54636D',
+      main: '#1B2533',
+      dark: '#050818'
     },
     error: {
-      light: '#de6967',
+      light: '#DE6967',
       main: '#D64441',
       dark: '#952f2d'
     },
     grey: {
-      50: '#B5B8BC',
-      100: '#979CA1',
-      200: '#7A8086',
-      300: '#5D646C',
-      400: '#49515A',
-      500: '#353E48',
-      600: '#353E48',
-      700: '#212B36',
-      800: '#1C242D',
-      900: '#101419'
+      50: '#B7C5C8',
+      100: '#A3B1B6',
+      200: '#909EA4',
+      300: '#7C8A92',
+      400: '#687780',
+      500: '#54636D',
+      600: '#2D3C49',
+      700: '#1B2533',
+      800: '#121929',
+      900: '#050818'
     },
     colors: {
       red: '#D64441',
       yellow: '#FAB849',
-      purple: '#BB6BD9',
+      lavander: '#BB6BD9',
       green: '#27AE60',
       blue: '#3FA7D6',
-      darkBlue: '#203753'
+      lightBlue: '#345995',
+      liberty: '#6761a8',
+      jungleGreen: '#43aa8b',
+      maximumRed: '#d62828',
+      darkYellow: '#f18805',
+      orange: '#f26430'
     },
     text: {
       disabled: 'rgba(255, 255, 255, 0.38)',

@@ -107,6 +107,8 @@ const Content = ({
                     setLoading(true);
                     try {
                       await overrideNextStepOnClick();
+                    } catch {
+                      return;
                     } finally {
                       setLoading(false);
                     }

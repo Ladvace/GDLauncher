@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, memo, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { push } from 'connected-react-router';
 import styled from 'styled-components';
@@ -8,8 +8,10 @@ import {
   faLongArrowAltUp,
   faLongArrowAltDown
 } from '@fortawesome/free-solid-svg-icons';
+import backgroundVideo from '../../../common/assets/onboarding.webm';
 import { _getCurrentAccount } from '../../../common/utils/selectors';
-import Logo from '../../../ui/Logo';
+import BisectHosting from '../../../ui/BisectHosting';
+import { openModal } from '../../../common/reducers/modals/actions';
 
 const Background = styled.div`
   position: absolute;
@@ -24,15 +26,15 @@ const scrollToRef = ref =>
 
 const Home = () => {
   const dispatch = useDispatch();
-  const account = useSelector(_getCurrentAccount);
   const [currentSlide, setCurrentSlide] = useState(0);
+  const [initScrolled, setInitScrolled] = useState(false);
+  const account = useSelector(_getCurrentAccount);
 
   const firstSlideRef = useRef(null);
   const secondSlideRef = useRef(null);
   const thirdSlideRef = useRef(null);
   const forthSlideRef = useRef(null);
   const fifthSlideRef = useRef(null);
-  const sixthSliderRef = useRef(null);
   const executeScroll = type => {
     if (currentSlide + type < 0 || currentSlide + type > 5) return;
     setCurrentSlide(currentSlide + type);
@@ -52,14 +54,18 @@ const Home = () => {
       case 4:
         scrollToRef(fifthSlideRef);
         break;
-      case 5:
-        scrollToRef(sixthSliderRef);
-        break;
       default:
         scrollToRef(firstSlideRef);
         break;
     }
   };
+
+  useEffect(() => {
+    setTimeout(() => {
+      setInitScrolled(true);
+      executeScroll(1);
+    }, 4800);
+  }, []);
 
   return (
     <Background>
@@ -79,7 +85,7 @@ const Home = () => {
         <div
           css={`
             font-size: 40px;
-            font-weight: 700;
+            font-weight: 800;
             text-align: center;
             display: flex;
             flex-direction: column;
@@ -87,21 +93,15 @@ const Home = () => {
             align-items: center;
           `}
         >
-          <Logo size={300} />
-          <div
+          <video
+            autoPlay
+            muted
             css={`
-              margin-top: 10%;
+              height: 100vh;
             `}
           >
-            Welcome to GDLauncher
-          </div>
-          <div
-            css={`
-              font-style: italic;
-            `}
-          >
-            {account.selectedProfile.name}!
-          </div>
+            <source src={backgroundVideo} type="video/webm" />
+          </video>
         </div>
       </div>
       <div
@@ -114,18 +114,17 @@ const Home = () => {
           flex-direction: column;
           justify-content: center;
           align-items: center;
-          color: ${props => props.theme.palette.text.primary};
         `}
       >
         <div
           css={`
-            font-size: 40px;
+            font-size: 30px;
             font-weight: 700;
             text-align: center;
+            padding: 0 120px;
           `}
         >
-          Before you start playing and having fun, here&apos;s something really
-          important we want you to know.
+          {account.selectedProfile.name}, welcome to GDLauncher!
         </div>
       </div>
       <div
@@ -145,13 +144,25 @@ const Home = () => {
             font-size: 30px;
             font-weight: 600;
             text-align: center;
-            margin: 20%;
+            margin: 20% 10%;
           `}
         >
-          GDLauncher is free and open source. Only a few developers work on it,
-          and they all have a full time job and a life outside of here. They do
-          this because they love helping the community by building an incredible
-          product that can make Minecraft more enjoyable.
+          GDlauncher is completely free and open source. <br />
+          If you want to support us, consider renting a server on BisectHosting,
+          our official partner!
+          <br />
+          <br />
+          <div
+            css={`
+              cursor: pointer;
+            `}
+          >
+            <BisectHosting
+              showPointerCursor
+              size={100}
+              onClick={() => dispatch(openModal('BisectHosting'))}
+            />
+          </div>
         </div>
       </div>
       <div
@@ -174,9 +185,7 @@ const Home = () => {
             margin: 20%;
           `}
         >
-          If you like GDLauncher please, take into consideration donating. Even
-          the equivalent of a single coffee would let us know that you like our
-          product and that we should keep working on it!
+          Or you can also support us through Patreon.
           <div
             css={`
               margin: 40px;
@@ -218,7 +227,7 @@ const Home = () => {
             margin: 20%;
           `}
         >
-          Also, don&apos;t forget to join us on discord! This is where our
+          Also, don&apos;t forget to join us on Discord! This is where our
           community is!
           <iframe
             css={`
@@ -233,33 +242,7 @@ const Home = () => {
           />
         </div>
       </div>
-      <div
-        ref={sixthSliderRef}
-        css={`
-          height: 100%;
-          width: 100%;
-          background: ${props => props.theme.palette.colors.darkBlue};
-          display: flex;
-          flex-direction: column;
-          justify-content: center;
-          align-items: center;
-        `}
-      >
-        <div
-          css={`
-            font-size: 30px;
-            font-weight: 600;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            margin: 20%;
-          `}
-        >
-          This is all. Go and have fun now!
-        </div>
-      </div>
-      {currentSlide !== 0 && (
+      {currentSlide !== 0 && currentSlide !== 1 && initScrolled && (
         <div
           css={`
             position: fixed;
@@ -284,39 +267,41 @@ const Home = () => {
           <FontAwesomeIcon icon={faLongArrowAltUp} />
         </div>
       )}
-      <div
-        css={`
-          position: fixed;
-          right: 20px;
-          bottom: 20px;
-          transition: 0.1s ease-in-out;
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          border-radius: 4px;
-          font-size: 40px;
-          cursor: pointer;
-          width: 70px;
-          height: 40px;
-          color: ${props => props.theme.palette.text.icon};
-          &:hover {
-            background: ${props => props.theme.action.hover};
-          }
-        `}
-        onClick={() => {
-          if (currentSlide === 5) {
-            dispatch(push('/home'));
-          } else {
-            executeScroll(1);
-          }
-        }}
-      >
-        <FontAwesomeIcon
-          icon={currentSlide === 5 ? faLongArrowAltRight : faLongArrowAltDown}
-        />
-      </div>
+      {currentSlide !== 0 && initScrolled && (
+        <div
+          css={`
+            position: fixed;
+            right: 20px;
+            bottom: 20px;
+            transition: 0.1s ease-in-out;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-radius: 4px;
+            font-size: 40px;
+            cursor: pointer;
+            width: 70px;
+            height: 40px;
+            color: ${props => props.theme.palette.text.icon};
+            &:hover {
+              background: ${props => props.theme.action.hover};
+            }
+          `}
+          onClick={() => {
+            if (currentSlide === 4) {
+              dispatch(push('/home'));
+            } else {
+              executeScroll(1);
+            }
+          }}
+        >
+          <FontAwesomeIcon
+            icon={currentSlide === 4 ? faLongArrowAltRight : faLongArrowAltDown}
+          />
+        </div>
+      )}
     </Background>
   );
 };
 
-export default Home;
+export default memo(Home);

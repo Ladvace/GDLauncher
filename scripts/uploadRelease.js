@@ -14,7 +14,7 @@ const stat = promisify(fs.stat);
 const deployFolder = path.resolve(__dirname, '../', 'deploy');
 
 const main = async () => {
-  if (!process.env.GITHUB_ACCESS_TOKEN_RELEASES) {
+  if (!process.env.GH_ACCESS_TOKEN_RELEASES) {
     console.warn('Cannot upload artifacts. No auth token provided');
     return;
   }
@@ -26,10 +26,10 @@ const main = async () => {
 
   try {
     const { data: releasesList } = await axios.default.get(
-      `https://api.github.com/repos/gorilla-devs/GDLauncher-Releases/releases`,
+      `https://api.github.com/repos/gorilla-devs/GDLauncher/releases`,
       {
         headers: {
-          Authorization: `token ${process.env.GITHUB_ACCESS_TOKEN_RELEASES}`
+          Authorization: `token ${process.env.GH_ACCESS_TOKEN_RELEASES}`
         }
       }
     );
@@ -38,23 +38,28 @@ const main = async () => {
 
     if (lastRelease) {
       uploadUrl = lastRelease.upload_url;
+      console.log('Found a release with this tag. Uploading there.');
     } else {
-      throw new Error();
+      throw new Error('Could not find release. Creating one.');
     }
   } catch (err) {
+    console.log(err);
     const { data: newRelease } = await axios.default.post(
-      'https://api.github.com/repos/gorilla-devs/GDLauncher-Releases/releases',
+      'https://api.github.com/repos/gorilla-devs/GDLauncher/releases',
       { tag_name: `v${version}`, name: `v${version}`, draft: true },
       {
         headers: {
-          Authorization: `token ${process.env.GITHUB_ACCESS_TOKEN_RELEASES}`
+          Authorization: `token ${process.env.GH_ACCESS_TOKEN_RELEASES}`
         }
       }
     );
     uploadUrl = newRelease.upload_url;
+    console.log('New release tag created.');
   }
 
   const deployFiles = await readdir(deployFolder);
+
+  console.log(`Found ${deployFiles.length} files to upload.`);
   let uploaded = 0;
   await pMap(
     deployFiles,
@@ -84,13 +89,14 @@ const main = async () => {
           headers: {
             'Content-Length': stats.size,
             'Content-Type': contentType,
-            Authorization: `token ${process.env.GITHUB_ACCESS_TOKEN_RELEASES}`
+            Authorization: `token ${process.env.GH_ACCESS_TOKEN_RELEASES}`
           },
           maxContentLength: Infinity,
           maxBodyLength: Infinity
         });
       } catch (err) {
         console.error(err.message);
+        throw err;
       }
       uploaded += 1;
       console.log(`Uploaded ${uploaded} / ${deployFiles.length} -- ${file}`);
