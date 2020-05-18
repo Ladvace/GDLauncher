@@ -1,7 +1,7 @@
 import axios from 'axios';
 import path from 'path';
 import { ipcRenderer } from 'electron';
-import uuid from 'uuid/v5';
+import { v5 as uuid } from 'uuid';
 import { machineId } from 'node-machine-id';
 import fse from 'fs-extra';
 import coerce from 'semver/functions/coerce';
@@ -21,8 +21,8 @@ import symlink from 'symlink-dir';
 import { promises as fs } from 'fs';
 import originalFs from 'original-fs';
 import pMap from 'p-map';
-import { message } from 'antd';
 import makeDir from 'make-dir';
+import { parse } from 'semver';
 import * as ActionTypes from './actionTypes';
 import {
   NEWS_URL,
@@ -50,7 +50,8 @@ import {
   getAddon,
   getAddonCategories,
   getJavaManifestFromMirror,
-  getOptifineHomePage
+  getOptifineHomePage,
+  getAddonCategories
 } from '../api';
 import {
   _getCurrentAccount,
@@ -87,7 +88,10 @@ import {
   filterFabricFilesByVersion,
   getPatchedInstanceType,
   convertCompletePathToInstance,
-  parseOptifineVersions
+  parseOptifineVersions,
+  convertCompletePathToInstance,
+  downloadAddonZip,
+  convertcurseForgeToCanonical
 } from '../../app/desktop/utils';
 import {
   downloadFile,
@@ -98,6 +102,7 @@ import { UPDATE_CONCURRENT_DOWNLOADS } from './settings/actionTypes';
 import { UPDATE_MODAL } from './modals/actionTypes';
 import PromiseQueue from '../../app/desktop/utils/PromiseQueue';
 import fmlLibsMapping from '../../app/desktop/utils/fmllibs';
+import { openModal } from './modals/actions';
 
 const getOptifine = instanceName => {
   return async (dispatch, getState) => {
@@ -151,21 +156,12 @@ export function initManifests() {
       return fabric;
     };
     const getJavaManifestVersions = async () => {
-      try {
-        const java = (await getJavaManifest()).data;
-        dispatch({
-          type: ActionTypes.UPDATE_JAVA_MANIFEST,
-          data: java
-        });
-        return java;
-      } catch {
-        const java = (await getJavaManifestFromMirror()).data;
-        dispatch({
-          type: ActionTypes.UPDATE_JAVA_MANIFEST,
-          data: java
-        });
-        return java;
-      }
+      const java = (await getJavaManifest()).data;
+      dispatch({
+        type: ActionTypes.UPDATE_JAVA_MANIFEST,
+        data: java
+      });
+      return java;
     };
     const getAddonCategoriesVersions = async () => {
       const curseforgeCategories = (await getAddonCategories()).data;
@@ -375,6 +371,15 @@ export function updateUserData(userData) {
   };
 }
 
+export function updateMessage(message) {
+  return dispatch => {
+    dispatch({
+      type: ActionTypes.UPDATE_MESSAGE,
+      message
+    });
+  };
+}
+
 export function downloadJavaLegacyFixer() {
   return async (dispatch, getState) => {
     const state = getState();
@@ -480,7 +485,10 @@ export function loginThroughNativeLauncher() {
 
     const homedir = await ipcRenderer.invoke('getAppdataPath');
     const mcFolder = process.platform === 'darwin' ? 'minecraft' : '.minecraft';
-    const vanillaMCPath = path.join(homedir, mcFolder);
+    const vanillaMCPath =
+      process.platform === 'linux'
+        ? path.resolve(homedir, '../', mcFolder)
+        : path.join(homedir, mcFolder);
     const vnlJson = await fse.readJson(
       path.join(vanillaMCPath, 'launcher_profiles.json')
     );
@@ -651,6 +659,15 @@ export function updateDownloadStatus(instanceName, status) {
   };
 }
 
+export function updateLastUpdateVersion(version) {
+  return dispatch => {
+    dispatch({
+      type: ActionTypes.UPDATE_LAST_UPDATE_VERSION,
+      version
+    });
+  };
+}
+
 export function updateDownloadCurrentPhase(instanceName, status) {
   return dispatch => {
     dispatch({
@@ -709,7 +726,8 @@ export function addToQueue(
   modloader,
   manifest,
   background,
-  optifine
+  optifine,
+  timePlayed
 ) {
   return async (dispatch, getState) => {
     const state = getState();
@@ -737,7 +755,7 @@ export function addToQueue(
         instanceName,
         prev => ({
           modloader,
-          timePlayed: prev.timePlayed || 0,
+          timePlayed: prev.timePlayed || timePlayed || 0,
           background,
           ...(addMods && { mods: [] }),
           ...((optifine && modloader[0] === VANILLA && { optifine }) ||
@@ -1184,15 +1202,6 @@ export function processManifest(instanceName) {
       { concurrency }
     );
 
-    await dispatch(
-      updateInstanceConfig(instanceName, config => {
-        return {
-          ...config,
-          mods: [...(config.mods || []), ...modManifests]
-        };
-      })
-    );
-
     dispatch(updateDownloadStatus(instanceName, 'Copying overrides...'));
     const addonPathZip = path.join(
       _getTempPath(state),
@@ -1229,19 +1238,54 @@ export function processManifest(instanceName) {
 
     dispatch(updateDownloadStatus(instanceName, 'Finalizing overrides...'));
 
-    // Force premature unlock to let our listener catch mods from override
-    lockfile.unlock(
-      path.join(_getInstancesPath(getState()), instanceName, 'installing.lock'),
-      err => {
-        if (err) console.log(err);
-      }
+    const overrideFiles = await getFilesRecursive(
+      path.join(_getTempPath(state), instanceName, 'overrides')
+    );
+    await dispatch(
+      updateInstanceConfig(instanceName, config => {
+        return {
+          ...config,
+          mods: [...(config.mods || []), ...modManifests],
+          overrides: overrideFiles.map(v =>
+            path.relative(
+              path.join(_getTempPath(state), instanceName, 'overrides'),
+              v
+            )
+          )
+        };
+      })
     );
 
-    await fse.copy(
-      path.join(_getTempPath(state), instanceName, 'overrides'),
-      path.join(_getInstancesPath(state), instanceName),
-      { overwrite: true }
+    await new Promise(resolve => {
+      // Force premature unlock to let our listener catch mods from override
+      lockfile.unlock(
+        path.join(
+          _getInstancesPath(getState()),
+          instanceName,
+          'installing.lock'
+        ),
+        err => {
+          if (err) console.error(err);
+          resolve();
+        }
+      );
+    });
+
+    await Promise.all(
+      overrideFiles.map(v => {
+        const relativePath = path.relative(
+          path.join(_getTempPath(state), instanceName, 'overrides'),
+          v
+        );
+        const newPath = path.join(
+          _getInstancesPath(state),
+          instanceName,
+          relativePath
+        );
+        return fse.copy(v, newPath, { overwrite: true });
+      })
     );
+
     await fse.remove(addonPathZip);
     await fse.remove(path.join(_getTempPath(state), instanceName));
   };
@@ -1377,6 +1421,103 @@ export function downloadInstance(instanceName) {
   };
 }
 
+export const changeModpackVersion = (instanceName, newModpackData) => {
+  return async (dispatch, getState) => {
+    const state = getState();
+    const instance = _getInstance(state)(instanceName);
+    const tempPath = _getTempPath(state);
+    const instancePath = path.join(_getInstancesPath(state), instanceName);
+
+    const { data: addon } = await getAddon(instance.modloader[3]);
+
+    const manifest = await fse.readJson(
+      path.join(instancePath, 'manifest.json')
+    );
+
+    await fse.remove(path.join(instancePath, 'manifest.json'));
+
+    // Delete prev overrides
+    await Promise.all(
+      (instance?.overrides || []).map(async v => {
+        try {
+          await fs.stat(path.join(instancePath, v));
+          await fse.remove(path.join(instancePath, v));
+        } catch {
+          // Swallow error
+        }
+      })
+    );
+
+    const modsProjectIDs = (manifest?.files || []).map(v => v?.projectID);
+
+    dispatch(
+      updateInstanceConfig(instanceName, prev =>
+        omit(
+          {
+            ...prev,
+            mods: prev.mods.filter(v => !modsProjectIDs.includes(v?.projectID))
+          },
+          ['overrides']
+        )
+      )
+    );
+
+    await Promise.all(
+      modsProjectIDs.map(async projectID => {
+        const modFound = instance.mods?.find(v => v?.projectID === projectID);
+        if (modFound?.fileName) {
+          try {
+            await fs.stat(path.join(instancePath, 'mods', modFound?.fileName));
+            await fse.remove(
+              path.join(instancePath, 'mods', modFound?.fileName)
+            );
+          } catch {
+            // Swallow error
+          }
+        }
+      })
+    );
+
+    const imageURL = addon?.attachments?.find(v => v.isDefault)?.thumbnailUrl;
+
+    const newManifest = await downloadAddonZip(
+      instance.modloader[3],
+      newModpackData.id,
+      path.join(_getInstancesPath(state), instanceName),
+      path.join(tempPath, instanceName)
+    );
+
+    await downloadFile(
+      path.join(
+        _getInstancesPath(state),
+        instanceName,
+        `background${path.extname(imageURL)}`
+      ),
+      imageURL
+    );
+
+    const modloader = [
+      instance.modloader[0],
+      newManifest.minecraft.version,
+      convertcurseForgeToCanonical(
+        newManifest.minecraft.modLoaders.find(v => v.primary).id,
+        newManifest.minecraft.version,
+        state.app.forgeManifest
+      ),
+      instance.modloader[3],
+      newModpackData.id
+    ];
+    dispatch(
+      addToQueue(
+        instanceName,
+        modloader,
+        manifest,
+        `background${path.extname(imageURL)}`
+      )
+    );
+  };
+};
+
 export const startListener = () => {
   return async (dispatch, getState) => {
     // Real Time Scanner
@@ -1384,35 +1525,30 @@ export const startListener = () => {
     const instancesPath = _getInstancesPath(state);
     const Queue = new PromiseQueue();
 
-    const notificationObj = {
-      key: 'RTSAction',
-      duration: 0
-    };
-
-    let closeMessage;
-
     Queue.on('start', queueLength => {
       if (queueLength > 1) {
-        closeMessage = message.loading({
-          ...notificationObj,
-          content: `Syncronizing files. ${queueLength} left.`
-        });
+        dispatch(
+          updateMessage({
+            content: `Syncronizing mods. ${queueLength} left.`,
+            duration: 0
+          })
+        );
       }
     });
 
     Queue.on('executed', queueLength => {
       if (queueLength > 1) {
-        closeMessage = message.loading({
-          ...notificationObj,
-          content: `Syncronizing files. ${queueLength} left.`
-        });
+        dispatch(
+          updateMessage({
+            content: `Syncronizing mods. ${queueLength} left.`,
+            duration: 0
+          })
+        );
       }
     });
 
     Queue.on('end', () => {
-      setTimeout(() => {
-        if (closeMessage) closeMessage();
-      }, 500);
+      dispatch(updateMessage(null));
     });
 
     const changesTracker = {};
@@ -1825,10 +1961,18 @@ export function launchInstance(instanceName) {
     const librariesPath = _getLibrariesPath(state);
     const assetsPath = _getAssetsPath(state);
     const { memory, args } = state.settings.java;
+    const {
+      resolution: globalMinecraftResolution
+    } = state.settings.minecraftSettings;
+    const {
+      modloader,
+      javaArgs,
+      javaMemory,
+      resolution: instanceResolution,
+      optifine
+    } = _getInstance(state)(instanceName);
+
     const optifineVersionsPath = _getOptifineVersionsPath(state);
-    const { modloader, javaArgs, javaMemory, optifine } = _getInstance(state)(
-      instanceName
-    );
     const instancePath = path.join(_getInstancesPath(state), instanceName);
     const sevenZipPath = await get7zPath();
 
@@ -1839,6 +1983,8 @@ export function launchInstance(instanceName) {
       '__JLF__.jar'
     );
     const tempFolder = _getTempPath(state);
+
+    let errorLogs = '';
 
     const mcJson = await fse.readJson(
       path.join(_getMinecraftVersionsPath(state), `${modloader[1]}.json`)
@@ -2048,6 +2194,7 @@ export function launchInstance(instanceName) {
 
     const javaArguments = (javaArgs !== undefined ? javaArgs : args).split(' ');
     const javaMem = javaMemory !== undefined ? javaMemory : memory;
+    const gameResolution = instanceResolution || globalMinecraftResolution;
 
     console.log('PPPP', optifine);
     const jvmArguments = getJvmArguments(
@@ -2060,6 +2207,7 @@ export function launchInstance(instanceName) {
       javaMem,
       optifineVersionNameFixedFormat,
       modloader,
+      gameResolution,
       false,
       javaArguments
     );
@@ -2086,6 +2234,7 @@ export function launchInstance(instanceName) {
         javaMem,
         optifineVersionNameFixedFormat,
         modloader,
+        gameResolution,
         true,
         javaArguments
       ).join(' ')}`.replace(...replaceRegex)
@@ -2112,6 +2261,13 @@ export function launchInstance(instanceName) {
         }))
       );
     }, 60 * 1000);
+
+    dispatch(
+      updateInstanceConfig(instanceName, prev => ({
+        ...prev,
+        lastPlayed: Date.now()
+      }))
+    );
     dispatch(addStartedInstance({ instanceName, pid: ps.pid }));
 
     ps.stdout.on('data', data => {
@@ -2123,6 +2279,7 @@ export function launchInstance(instanceName) {
 
     ps.stderr.on('data', data => {
       console.error(`ps stderr: ${data}`);
+      errorLogs += data || '';
     });
 
     ps.on('close', code => {
@@ -2131,7 +2288,13 @@ export function launchInstance(instanceName) {
       if (process.platform === 'win32') fse.remove(symLinkDirPath);
       dispatch(removeStartedInstance(instanceName));
       clearInterval(playTimer);
-      if (code !== 0) {
+      if (code !== 0 && errorLogs) {
+        dispatch(
+          openModal('InstanceCrashed', {
+            code,
+            errorLogs: errorLogs?.toString('utf8')
+          })
+        );
         console.warn(`Process exited with code ${code}. Not too good..`);
       }
     });
@@ -2319,30 +2482,56 @@ export const initLatestMods = instanceName => {
   };
 };
 
+export const getAppLatestVersion = () => {
+  return async () => {
+    const { data: latestReleases } = await axios.get(
+      'https://api.github.com/repos/gorilla-devs/GDLauncher/releases'
+    );
+
+    const latestPrerelease = latestReleases.find(v => v.prerelease);
+    const latestStablerelease = latestReleases.find(v => !v.prerelease);
+
+    const appData = parse(await ipcRenderer.invoke('getAppdataPath'));
+    let releaseChannel = 0;
+
+    try {
+      const rChannel = await fs.readFile(
+        path.join(appData, 'gdlauncher_next', 'rChannel')
+      );
+      releaseChannel = rChannel.toString();
+    } catch {
+      // swallow error
+    }
+
+    const installedVersion = parse(await ipcRenderer.invoke('getAppVersion'));
+    const isAppUpdated = r => !lt(installedVersion, parse(r.tag_name));
+    if (!isAppUpdated(latestStablerelease)) {
+      return latestStablerelease;
+    }
+    if (!isAppUpdated(latestPrerelease) && releaseChannel !== 0) {
+      return latestPrerelease;
+    }
+
+    return false;
+  };
+};
+
 export const checkForPortableUpdates = () => {
   return async (dispatch, getState) => {
     const state = getState();
     const baseFolder = await ipcRenderer.invoke('getExecutablePath');
 
-    const { data: latestRelease } = await axios.get(
-      'https://api.github.com/repos/gorilla-devs/GDLauncher-Releases/releases/latest'
-    );
-
     const tempFolder = path.join(_getTempPath(state), `update`);
 
-    const installedVersion = coerce(await ipcRenderer.invoke('getAppVersion'));
-    const isUpdateAvailable = lt(
-      installedVersion,
-      coerce(latestRelease.tag_name)
-    );
+    const latestVersion = await getAppLatestVersion();
 
-    const baseAssetUrl = `https://github.com/gorilla-devs/GDLauncher-Releases/releases/download/${latestRelease.tag_name}`;
-
-    const { data: latestManifest } = await axios.get(
-      `${baseAssetUrl}/${process.platform}_latest.json`
-    );
-
-    if (isUpdateAvailable) {
+    // Latest version has a value only if the user is not using the latest
+    if (latestVersion) {
+      // eslint-disable-next-line
+      const baseAssetUrl = `https://github.com/gorilla-devs/GDLauncher/releases/download/${latestVersion?.tag_name}`;
+      const { data: latestManifest } = await axios.get(
+        `${baseAssetUrl}/${process.platform}_latest.json`
+      );
       // Cleanup all files that are not required for the update
       await makeDir(tempFolder);
 
@@ -2452,6 +2641,6 @@ export const checkForPortableUpdates = () => {
         { concurrency: 3 }
       );
     }
-    return isUpdateAvailable;
+    return latestVersion;
   };
 };

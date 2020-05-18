@@ -141,7 +141,12 @@ const Screenshots = ({ instanceName }) => {
     async fileName => {
       if (selectedItems.length === 1) {
         await fse.remove(
-          path.join(instancesPath, instanceName, 'screenshots', fileName)
+          path.join(
+            instancesPath,
+            instanceName,
+            'screenshots',
+            selectedItems[0]
+          )
         );
       } else if (selectedItems.length > 1) {
         Promise.all(
@@ -202,8 +207,7 @@ const Screenshots = ({ instanceName }) => {
             getScreenshotsCount(dateGroups) === selectedItems.length
           }
         />
-        <div>{`${selectedItems.length} selected`}</div>
-
+        <div>&nbsp;{`${selectedItems.length} selected`}</div>
         <DeleteButton
           onClick={() => {
             dispatch(
@@ -259,7 +263,10 @@ const Screenshots = ({ instanceName }) => {
                               )
                             }
                             selected={selectedItems.indexOf(file.name) > -1}
-                            src={path.join(screenshotsPath, file.name)}
+                            src={`file:///${path.join(
+                              screenshotsPath,
+                              file.name
+                            )}`}
                           />
                         </PhotoContainer>
                       </ContextMenuTrigger>
@@ -475,7 +482,10 @@ const StyledContexMenu = styled(ContextMenu)`
   }
 `;
 
-const DeleteButton = styled(FontAwesomeIcon)`
+const DeleteButton = styled(({ selectedItems, ...props }) => (
+  // eslint-disable-next-line react/jsx-props-no-spreading
+  <FontAwesomeIcon {...props} />
+))`
   margin-left: 20px;
   transition: color 0.3s ease-in-out;
   &:hover {

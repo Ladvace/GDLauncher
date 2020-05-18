@@ -1,41 +1,39 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import fss from 'fs-extra';
+
 import path from 'path';
+
 import omit from 'lodash/omit';
 import { useDebouncedCallback } from 'use-debounce';
 import styled from 'styled-components';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSave, faUndo } from '@fortawesome/free-solid-svg-icons';
-import { Input, Button, Card, Switch, Slider } from 'antd';
+import { Input, Button, Switch, Slider, Select } from 'antd';
+import { ipcRenderer } from 'electron';
 import { _getInstancesPath, _getInstance } from '../../utils/selectors';
-import { DEFAULT_JAVA_ARGS } from '../../../app/desktop/utils/constants';
-
+import {
+  DEFAULT_JAVA_ARGS,
+  resolutionPresets
+} from '../../../app/desktop/utils/constants';
 import { updateInstanceConfig } from '../../reducers/actions';
+import { convertMinutesToHumanTime } from '../../utils';
 
 const Container = styled.div`
-  margin-left: 50px;
+  padding: 0 50px;
   height: 100%;
   overflow-y: auto;
   overflow-x: hidden;
 `;
 
-const Column = styled.div`
-  max-width: 600px;
-`;
-
-const MainTitle = styled.h1`
-  color: ${props => props.theme.palette.text.primary};
-  margin: 0 500px 20px 0;
-  margin-bottom: 20px;
-`;
+const Column = styled.div``;
 
 const RenameRow = styled.div`
   display: flex;
   flex-direction: row;
   justify-content: space-between;
   color: ${props => props.theme.palette.text.primary};
-  margin: 0 500px 20px 0;
+  margin: 30px 0 30px 0;
   width: 100%;
 `;
 
@@ -43,9 +41,35 @@ const RenameButton = styled(Button)`
   margin-left: 20px;
 `;
 
-const JavaManagerCard = styled(Card)`
-  margin-bottom: 20px;
+const CardBox = styled.div`
+  flex: 1;
+  height: 60px;
+  font-weight: 500;
+  border-radius: ${props => props.theme.shape.borderRadius};
+  color: ${props => props.theme.palette.text.primary};
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  font-size: 20px;
+  position: relative;
+  padding: 0 10px;
+`;
+
+const OverviewCard = styled.div`
+  margin-bottom: 30px;
   padding: 0;
+  ${CardBox} {
+    margin: 0 20px;
+  }
+  ${CardBox}:first-child {
+    margin-right: 20px;
+    margin-left: 0;
+  }
+  ${CardBox}:last-child {
+    margin-left: 20px;
+    margin-right: 0;
+  }
 `;
 
 const JavaManagerRow = styled.div`
@@ -53,7 +77,7 @@ const JavaManagerRow = styled.div`
   flex-direction: row;
   justify-content: space-between;
   color: ${props => props.theme.palette.text.primary};
-  margin: 0 500px 20px 0;
+  margin: 0 500px 30px 0;
   width: 100%;
 `;
 
@@ -63,6 +87,22 @@ const JavaMemorySlider = styled(Slider)`
 
 const JavaArgumentsResetButton = styled(Button)`
   margin-left: 20px;
+`;
+
+const ResolutionInputContainer = styled.div`
+  margin: 10px 0 30px 0;
+  width: 100%;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+
+  div {
+    width: 200px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+  }
 `;
 
 const marks = {
@@ -86,8 +126,18 @@ const Overview = ({ instanceName }) => {
     config?.javaArgs
   );
   const [newName, setNewName] = useState(instanceName);
+  const [screenResolution, setScreenResolution] = useState(null);
+  const [height, setHeight] = useState(config?.resolution?.height);
+  const [width, setWidth] = useState(config?.resolution?.width);
 
   const dispatch = useDispatch();
+
+  useEffect(() => {
+    ipcRenderer
+      .invoke('getAllDisplaysBounds')
+      .then(setScreenResolution)
+      .catch(console.error);
+  }, []);
 
   const updateJavaMemory = v => {
     dispatch(
@@ -103,6 +153,15 @@ const Overview = ({ instanceName }) => {
       updateInstanceConfig(instanceName, prev => ({
         ...prev,
         javaArgs: v
+      }))
+    );
+  };
+
+  const updateGameResolution = (w, h) => {
+    dispatch(
+      updateInstanceConfig(instanceName, prev => ({
+        ...prev,
+        resolution: { height: h, width: w }
       }))
     );
   };
@@ -126,10 +185,156 @@ const Overview = ({ instanceName }) => {
       path.join(instancesPath, newName)
     );
   };
+
+  const computeLastPlayed = timestamp => {
+    const lastPlayed = new Date(timestamp);
+    const timeDiff = lastPlayed.getTime() - new Date(Date.now()).getTime();
+    const diffDays = Math.ceil(timeDiff / (1000 * 3600 * 24));
+    switch (diffDays) {
+      case 0:
+        return 'Today';
+      case -1:
+        return 'Yesterday';
+      default:
+        return lastPlayed.toLocaleDateString(undefined, {
+          year: 'numeric',
+          month: 'numeric',
+          day: 'numeric'
+        });
+    }
+  };
+
   return (
     <Container>
       <Column>
-        <MainTitle>Overview</MainTitle>
+        <OverviewCard
+          css={`
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            margin-top: 20px;
+          `}
+        >
+          <CardBox
+            css={`
+              background: ${props => props.theme.palette.colors.jungleGreen};
+            `}
+          >
+            <div
+              css={`
+                position: absolute;
+                top: 5px;
+                left: 10px;
+                font-size: 10px;
+                color: ${props => props.theme.palette.text.secondary};
+              `}
+            >
+              Minecraft Version
+            </div>
+            <div>{config?.modloader[1]}</div>
+          </CardBox>
+          <CardBox
+            css={`
+              background: ${props => props.theme.palette.colors.darkYellow};
+            `}
+          >
+            <div
+              css={`
+                position: absolute;
+                top: 5px;
+                left: 10px;
+                font-size: 10px;
+                color: ${props => props.theme.palette.text.secondary};
+              `}
+            >
+              Modloader
+            </div>
+            <div>{config?.modloader[0]}</div>
+          </CardBox>
+          <CardBox
+            css={`
+              background: ${props => props.theme.palette.colors.lightBlue};
+            `}
+          >
+            <div
+              css={`
+                position: absolute;
+                top: 5px;
+                left: 10px;
+                font-size: 10px;
+                color: ${props => props.theme.palette.text.secondary};
+              `}
+            >
+              Modloader Version
+            </div>
+            <div>{config?.modloader[2] || '-'}</div>
+          </CardBox>
+        </OverviewCard>
+        <OverviewCard
+          css={`
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            margin-bottom: 60px;
+          `}
+        >
+          <CardBox
+            css={`
+              background: ${props => props.theme.palette.colors.maximumRed};
+            `}
+          >
+            <div
+              css={`
+                position: absolute;
+                top: 5px;
+                left: 10px;
+                font-size: 10px;
+                color: ${props => props.theme.palette.text.secondary};
+              `}
+            >
+              Mods
+            </div>
+            <div>{config?.mods?.length || '-'}</div>
+          </CardBox>
+          <CardBox
+            css={`
+              background: ${props => props.theme.palette.colors.liberty};
+            `}
+          >
+            <div
+              css={`
+                position: absolute;
+                top: 5px;
+                left: 10px;
+                font-size: 10px;
+                color: ${props => props.theme.palette.text.secondary};
+              `}
+            >
+              Played Time
+            </div>
+            <div>{convertMinutesToHumanTime(config?.timePlayed)}</div>
+          </CardBox>
+          <CardBox
+            css={`
+              background: ${props => props.theme.palette.colors.orange};
+            `}
+          >
+            <div
+              css={`
+                position: absolute;
+                top: 5px;
+                left: 10px;
+                font-size: 10px;
+                color: ${props => props.theme.palette.text.secondary};
+              `}
+            >
+              Last Played
+            </div>
+            <div>
+              {config?.lastPlayed ? computeLastPlayed(config?.lastPlayed) : '-'}
+            </div>
+          </CardBox>
+        </OverviewCard>
         <RenameRow>
           <Input value={newName} onChange={e => setNewName(e.target.value)} />
           <RenameButton onClick={() => renameInstance()} type="primary">
@@ -137,9 +342,102 @@ const Overview = ({ instanceName }) => {
             <FontAwesomeIcon icon={faSave} />
           </RenameButton>
         </RenameRow>
-        <JavaManagerCard title="Override Java Settings">
+        <OverviewCard>
           <JavaManagerRow>
-            <div>Java Memory</div>
+            <div>Override Game Resolution</div>
+            <Switch
+              checked={height && width}
+              onChange={v => {
+                if (!v) {
+                  setHeight(null);
+                  setWidth(null);
+                  dispatch(
+                    updateInstanceConfig(instanceName, prev =>
+                      omit(prev, ['resolution'])
+                    )
+                  );
+                } else {
+                  updateGameResolution(854, 480);
+                  setHeight(480);
+                  setWidth(854);
+                }
+              }}
+            />
+          </JavaManagerRow>
+          {height && width && (
+            <ResolutionInputContainer>
+              <div>
+                <Input
+                  placeholder="Width"
+                  value={width}
+                  onChange={e => {
+                    const w = parseInt(e.target.value, 10) || 854;
+                    setWidth(w);
+                    dispatch(
+                      updateInstanceConfig(instanceName, prev => ({
+                        ...prev,
+                        resolution: {
+                          height,
+                          width: w
+                        }
+                      }))
+                    );
+                  }}
+                />
+                &nbsp;X&nbsp;
+                <Input
+                  placeholder="Height"
+                  value={height}
+                  onChange={e => {
+                    const h = parseInt(e.target.value, 10) || 480;
+                    setHeight(h);
+                    dispatch(
+                      updateInstanceConfig(instanceName, prev => ({
+                        ...prev,
+                        resolution: {
+                          height: h,
+                          width
+                        }
+                      }))
+                    );
+                  }}
+                />
+              </div>
+              <Select
+                placeholder="Presets"
+                onChange={v => {
+                  const w = parseInt(v.split('x')[0], 10);
+                  const h = parseInt(v.split('x')[1], 10);
+                  setHeight(h);
+                  setWidth(w);
+                  dispatch(
+                    updateInstanceConfig(instanceName, prev => ({
+                      ...prev,
+                      resolution: {
+                        height: h,
+                        width: w
+                      }
+                    }))
+                  );
+                }}
+              >
+                {resolutionPresets.map(v => {
+                  const w = parseInt(v.split('x')[0], 10);
+                  const h = parseInt(v.split('x')[1], 10);
+
+                  const isBiggerThanScreen = (screenResolution || []).every(
+                    bounds => {
+                      return bounds.width < w || bounds.height < h;
+                    }
+                  );
+                  if (isBiggerThanScreen) return null;
+                  return <Select.Option value={v}>{v}</Select.Option>;
+                })}
+              </Select>
+            </ResolutionInputContainer>
+          )}
+          <JavaManagerRow>
+            <div>Override Java Memory</div>
             <Switch
               checked={JavaMemorySwitch}
               onChange={v => {
@@ -173,7 +471,7 @@ const Overview = ({ instanceName }) => {
             </div>
           )}
           <JavaManagerRow>
-            <div>Java Arguments</div>
+            <div>Override Java Arguments</div>
             <Switch
               checked={JavaArgumentsSwitch}
               onChange={v => {
@@ -205,7 +503,7 @@ const Overview = ({ instanceName }) => {
               </JavaArgumentsResetButton>
             </JavaManagerRow>
           )}
-        </JavaManagerCard>
+        </OverviewCard>
       </Column>
     </Container>
   );

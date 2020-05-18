@@ -9,13 +9,10 @@ import path from 'path';
 import { extractFull } from 'node-7z';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faFolder } from '@fortawesome/free-solid-svg-icons';
+import { spawn } from 'child_process';
 import Modal from '../components/Modal';
 import { downloadFile } from '../../app/desktop/utils/downloader';
-import {
-  convertOSToJavaFormat,
-  get7zPath,
-  fixFilePermissions
-} from '../../app/desktop/utils';
+import { convertOSToJavaFormat, get7zPath } from '../../app/desktop/utils';
 import { _getTempPath } from '../utils/selectors';
 import { closeModal } from '../reducers/modals/actions';
 import { updateJavaPath } from '../reducers/settings/actions';
@@ -291,9 +288,35 @@ const AutomaticSetup = () => {
     await fse.remove(path.join(tempFolder, `${releaseName}-jre`));
 
     const ext = process.platform === 'win32' ? '.exe' : '';
-    await fixFilePermissions(
-      path.join(javaBaseFolder, version, 'bin', `java${ext}`)
-    );
+
+    if (process.platform !== 'win32') {
+      const execPath = path.join(javaBaseFolder, version, 'bin', `java${ext}`);
+
+      const chmod = spawn(`chmod`, ['+x', `"${execPath}"`], {
+        shell: true
+      });
+
+      chmod.stdout.on('data', data => {
+        console.log(data.toString());
+      });
+
+      chmod.stderr.on('data', data => {
+        console.error(data);
+      });
+
+      const chmodExec = spawn(`chmod`, ['755', `"${execPath}"`], {
+        shell: true
+      });
+
+      chmodExec.stdout.on('data', data => {
+        console.log(data.toString());
+      });
+
+      chmodExec.stderr.on('data', data => {
+        console.error(data);
+      });
+    }
+
     dispatch(updateJavaPath(null));
     setCurrentStep(`Java is ready!`);
     ipcRenderer.invoke('update-progress-bar', -1);

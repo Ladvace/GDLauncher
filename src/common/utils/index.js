@@ -8,8 +8,8 @@ export const sortByDate = (a, b) => {
 
 export function sortByForgeVersionDesc(a, b) {
   if (typeof a === 'string' && typeof b === 'string') {
-    const versionA = a.split('.');
-    const versionB = b.split('.');
+    const versionA = a.split('-')[1].split('.');
+    const versionB = b.split('-')[1].split('.');
 
     for (let i = 0; i < versionA.length; i += 1) {
       const verNumA = Number(versionA[i]) || 0;
@@ -64,4 +64,39 @@ export const removeDuplicates = (myArr, prop) => {
   return myArr.filter((obj, pos, arr) => {
     return arr.map(mapObj => mapObj[prop]).indexOf(obj[prop]) === pos;
   });
+};
+
+export const convertMinutesToHumanTime = minutes => {
+  const days = Math.floor(minutes / 1440); // 60*24
+  const hours = Math.floor((minutes - days * 1440) / 60);
+  const min = Math.round(minutes % 60);
+  const weeks = Math.floor(days / 7);
+  const months = Math.floor(weeks / 4);
+
+  // values to display: d, h, m, minutes, days, weeks, months
+
+  switch (true) {
+    case months >= 2:
+      return `${months} months`;
+    case months === 1:
+      return `1 month`;
+    case weeks >= 2:
+      return `${weeks} weeks`;
+    case weeks === 1:
+      return `1 week`;
+    case days >= 1:
+      return `${days} d, ${hours} h, ${min} m`;
+    case hours >= 2:
+      return `${hours} h, ${min} m`;
+    case hours === 1:
+      return `1 hour`;
+    case minutes >= 2:
+      return `${min} minutes`;
+    case minutes === 1:
+      return `1 minute`;
+    case minutes === 0:
+      return '0 minutes';
+    default:
+      return '';
+  }
 };
