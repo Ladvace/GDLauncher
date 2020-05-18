@@ -49,9 +49,7 @@ import {
   getAddonFiles,
   getAddon,
   getAddonCategories,
-  getJavaManifestFromMirror,
-  getOptifineHomePage,
-  getAddonCategories
+  getOptifineHomePage
 } from '../api';
 import {
   _getCurrentAccount,
@@ -89,7 +87,6 @@ import {
   getPatchedInstanceType,
   convertCompletePathToInstance,
   parseOptifineVersions,
-  convertCompletePathToInstance,
   downloadAddonZip,
   convertcurseForgeToCanonical
 } from '../../app/desktop/utils';
