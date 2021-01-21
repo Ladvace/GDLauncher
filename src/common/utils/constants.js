@@ -29,6 +29,7 @@ export const FTB = 'ftb';
 export const ACCOUNT_MOJANG = 'ACCOUNT_MOJANG';
 export const ACCOUNT_MICROSOFT = 'ACCOUNT_MICROSOFT';
 export const CURSEFORGE_URL = 'https://www.curseforge.com';
+export const MODRINTH = 'https://api.modrinth.com';
 export const MICROSOFT_LIVE_LOGIN_URL = 'https://login.live.com';
 export const MICROSOFT_XBOX_LOGIN_URL = 'https://user.auth.xboxlive.com';
 export const MICROSOFT_XSTS_AUTH_URL = 'https://xsts.auth.xboxlive.com';

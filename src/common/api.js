@@ -13,7 +13,8 @@ import {
   MICROSOFT_XBOX_LOGIN_URL,
   MICROSOFT_XSTS_AUTH_URL,
   MINECRAFT_SERVICES_URL,
-  FTB_API_URL
+  FTB_API_URL,
+  MODRINTH
 } from './utils/constants';
 import { sortByDate } from './utils';
 
@@ -310,5 +311,52 @@ export const getFTBMostPlayed = async () => {
 
 export const getFTBSearch = async searchText => {
   const url = `${FTB_API_URL}/modpack/search/1000?term=${searchText}`;
+  return axios.get(url);
+};
+
+// modrinth
+
+export const getModrinthMods = async (filter, modloader, limit, offset) => {
+  const url = `${MODRINTH}/api/v1/mod?limit=${limit || 50}&offset=${
+    offset || 0
+  }${filter && `&index=${filter}`}&filters=${`categories="${modloader}"`}`;
+
+  console.log('url', url);
+  return axios.get(url);
+};
+
+export const getModrinthMod = async modId => {
+  const url = `${MODRINTH}/api/v1/mod/${modId}`;
+  const { data } = await axios.get(url);
+  return data;
+};
+
+export const getModrinthModVersionsList = async modId => {
+  try {
+    const url = `${MODRINTH}/api/v1/mod/${modId}/version`;
+    const { data } = await axios.get(url);
+    return data;
+  } catch {
+    return { status: 'error' };
+  }
+};
+
+export const getModrinthModVersion = async versionId => {
+  try {
+    const url = `${MODRINTH}/api/v1/version/${versionId}`;
+    const { data } = await axios.get(url);
+    return data;
+  } catch {
+    return { status: 'error' };
+  }
+};
+
+export const getModrinthModsCategories = async () => {
+  const url = `${MODRINTH}/api/v1/tag/category`;
+  return axios.get(url);
+};
+
+export const getModrinthGameVersions = async () => {
+  const url = `${MODRINTH}/api/v1/tag/game_version`;
   return axios.get(url);
 };

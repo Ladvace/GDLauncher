@@ -754,6 +754,19 @@ const Mods = ({ instanceName }) => {
         >
           Add Mod
         </Button>
+        <Button
+          type="primary"
+          onClick={() => {
+            dispatch(
+              openModal('ModrinthModsBrowser', {
+                gameVersion: instance.modloader?.mcVersion,
+                instanceName
+              })
+            );
+          }}
+        >
+          Add Modrinth Mod
+        </Button>
         <Input
           allowClear
           value={search}

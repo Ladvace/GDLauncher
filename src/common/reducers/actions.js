@@ -64,7 +64,8 @@ import {
   msAuthenticateXSTS,
   msAuthenticateMinecraft,
   msMinecraftProfile,
-  msOAuthRefresh
+  msOAuthRefresh,
+  getModrinthMod
 } from '../api';
 import {
   _getCurrentAccount,
@@ -2542,6 +2543,112 @@ export function launchInstance(instanceName) {
         console.warn(`Process exited with code ${code}. Not too good..`);
       }
     });
+  };
+}
+
+export function installModrinthMod(
+  modId,
+  url,
+  instanceName,
+  gameVersion,
+  // installDeps = true,
+  onProgress,
+  useTempMiddleware
+) {
+  return async (dispatch, getState) => {
+    const state = getState();
+    const instancesPath = _getInstancesPath(state);
+    const instancePath = path.join(instancesPath, instanceName);
+    // const instance = _getInstance(state)(instanceName);
+    const fileName = path.basename(url);
+    const mainModData = await getModrinthMod(modId);
+
+    const destFile = path.join(instancePath, 'mods', fileName);
+    const tempFile = path.join(_getTempPath(state), fileName);
+
+    if (useTempMiddleware) {
+      await downloadFile(tempFile, url, onProgress);
+    }
+
+    let needToAddMod = true;
+
+    await dispatch(
+      updateInstanceConfig(instanceName, prev => {
+        needToAddMod = !prev.mods.find(v => v?.id && v?.id === mainModData?.id);
+        return {
+          ...prev,
+          mods: [
+            ...prev.mods,
+            ...(needToAddMod
+              ? [
+                  {
+                    id: mainModData?.id,
+                    displayName: mainModData.title,
+                    fileName,
+                    downloadUrl: url
+                  }
+                ]
+              : [])
+          ]
+        };
+      })
+    );
+
+    if (!needToAddMod) {
+      if (useTempMiddleware) {
+        await fse.remove(tempFile);
+      }
+      return;
+    }
+
+    if (!useTempMiddleware) {
+      try {
+        await fse.access(destFile);
+        const murmur2 = await getFileMurmurHash2(destFile);
+        if (murmur2 !== mainModData.packageFingerprint) {
+          await downloadFile(destFile, url, onProgress);
+        }
+      } catch {
+        await downloadFile(destFile, url, onProgress);
+      }
+    } else {
+      await fse.move(tempFile, destFile, { overwrite: true });
+    }
+
+    // if (installDeps) {
+    //   await pMap(
+    //     mainModData.data.dependencies,
+    //     async dep => {
+    //       // type 1: embedded
+    //       // type 2: optional
+    //       // type 3: required
+    //       // type 4: tool
+    //       // type 5: incompatible
+    //       // type 6: include
+
+    //       if (dep.type === 3) {
+    //         if (instance.mods.some(x => x.projectID === dep.addonId)) return;
+    //         const depList = await getAddonFiles(dep.addonId);
+    //         const depData = depList.data.find(v =>
+    //           v.gameVersion.includes(gameVersion)
+    //         );
+    //         await dispatch(
+    //           installMod(
+    //             dep.addonId,
+    //             depData.id,
+    //             instanceName,
+    //             gameVersion,
+    //             installDeps,
+    //             onProgress,
+    //             useTempMiddleware
+    //           )
+    //         );
+    //       }
+    //     },
+    //     { concurrency: 2 }
+    //   );
+    // }
+    return destFile;
   };
 }
 
