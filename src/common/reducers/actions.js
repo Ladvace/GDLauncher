@@ -65,7 +65,8 @@ import {
   msAuthenticateMinecraft,
   msMinecraftProfile,
   msOAuthRefresh,
-  getModrinthMod
+  getModrinthMod,
+  getModrinthModVersion
 } from '../api';
 import {
   _getCurrentAccount,
@@ -2550,10 +2551,9 @@ export function installModrinthMod(
   modId,
   url,
   instanceName,
-  gameVersion,
-  // installDeps = true,
-  onProgress,
-  useTempMiddleware
+  latestModId,
+  onProgress
+  // installAnotherVersion
 ) {
   return async (dispatch, getState) => {
     const state = getState();
@@ -2561,14 +2561,19 @@ export function installModrinthMod(
     const instancePath = path.join(instancesPath, instanceName);
     // const instance = _getInstance(state)(instanceName);
     const fileName = path.basename(url);
-    const mainModData = await getModrinthMod(modId);
+
+    const mainModData = latestModId
+      ? await getModrinthModVersion(modId)
+      : await getModrinthMod(modId);
+
+    console.log('VEDIAMO', latestModId);
 
     const destFile = path.join(instancePath, 'mods', fileName);
-    const tempFile = path.join(_getTempPath(state), fileName);
+    // const tempFile = path.join(_getTempPath(state), fileName);
 
-    if (useTempMiddleware) {
-      await downloadFile(tempFile, url, onProgress);
-    }
+    // if (useTempMiddleware) {
+    //   await downloadFile(tempFile, url, onProgress);
+    // }
 
     let needToAddMod = true;
 
@@ -2594,60 +2599,50 @@ export function installModrinthMod(
       })
     );
 
+    if (latestModId) {
+      // const versionIds = await getModrinthModVersionsList(id);
+
+      // const mod = await getModrinthModVersion(versionIds[0]);
+
+      // const urlMod = mod?.files[0].url;
+
+      const mod = await getModrinthMod(latestModId);
+      const modLatestVersion = await getModrinthModVersion(mod?.versions[0]);
+      const urlMod = modLatestVersion?.files[0].url;
+      const oldFileName = path.basename(urlMod);
+
+      console.log(
+        'latestModId',
+        latestModId,
+        mod,
+        modLatestVersion,
+        urlMod,
+        path.join(instancePath, 'mods', oldFileName)
+      );
+      fs.unlink(path.join(instancePath, 'mods', oldFileName));
+    }
+
     if (!needToAddMod) {
-      if (useTempMiddleware) {
-        await fse.remove(tempFile);
-      }
+      // if (useTempMiddleware) {
+      // await fse.remove(tempFile);
+      // }
       return;
     }
 
-    if (!useTempMiddleware) {
-      try {
-        await fse.access(destFile);
-        const murmur2 = await getFileMurmurHash2(destFile);
-        if (murmur2 !== mainModData.packageFingerprint) {
-          await downloadFile(destFile, url, onProgress);
-        }
-      } catch {
+    // if (!useTempMiddleware) {
+    try {
+      await fse.access(destFile);
+      const murmur2 = await getFileMurmurHash2(destFile);
+      if (murmur2 !== mainModData.packageFingerprint) {
         await downloadFile(destFile, url, onProgress);
       }
-    } else {
-      await fse.move(tempFile, destFile, { overwrite: true });
+    } catch {
+      await downloadFile(destFile, url, onProgress);
     }
-
-    // if (installDeps) {
-    //   await pMap(
-    //     mainModData.data.dependencies,
-    //     async dep => {
-    //       // type 1: embedded
-    //       // type 2: optional
-    //       // type 3: required
-    //       // type 4: tool
-    //       // type 5: incompatible
-    //       // type 6: include
-
-    //       if (dep.type === 3) {
-    //         if (instance.mods.some(x => x.projectID === dep.addonId)) return;
-    //         const depList = await getAddonFiles(dep.addonId);
-    //         const depData = depList.data.find(v =>
-    //           v.gameVersion.includes(gameVersion)
-    //         );
-    //         await dispatch(
-    //           installMod(
-    //             dep.addonId,
-    //             depData.id,
-    //             instanceName,
-    //             gameVersion,
-    //             installDeps,
-    //             onProgress,
-    //             useTempMiddleware
-    //           )
-    //         );
-    //       }
-    //     },
-    //     { concurrency: 2 }
-    //   );
+    // } else {
+    //   await fse.move(tempFile, destFile, { overwrite: true });
     // }
+
     return destFile;
   };
 }

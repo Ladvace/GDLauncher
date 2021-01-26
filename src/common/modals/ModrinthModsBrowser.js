@@ -16,6 +16,7 @@ import { Input, Select, Button } from 'antd';
 import { useDispatch, useSelector } from 'react-redux';
 import { useDebouncedCallback } from 'use-debounce';
 import { FixedSizeList as List } from 'react-window';
+import path from 'path';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCheckCircle } from '@fortawesome/free-regular-svg-icons';
 import { faBomb, faExclamationCircle } from '@fortawesome/free-solid-svg-icons';
@@ -194,17 +195,15 @@ const ModsListWrapper = ({
               transition: color 0.1s ease-in-out;
               cursor: pointer;
             `}
-            // onClick={() => {
-            //   dispatch(
-            //     openModal('ModOverview', {
-            //       gameVersion,
-            //       projectID: id,
-            //       ...(isInstalled && { fileID: isInstalled.fileID }),
-            //       ...(isInstalled && { fileName: isInstalled.fileName }),
-            //       instanceName
-            //     })
-            //   );
-            // }}
+            onClick={() => {
+              dispatch(
+                openModal('ModrinthModOverview', {
+                  gameVersion,
+                  id,
+                  instanceName
+                })
+              );
+            }}
           >
             {item.title}
           </div>
@@ -217,17 +216,15 @@ const ModsListWrapper = ({
                 css={`
                   margin-right: 10px;
                 `}
-                // onClick={() => {
-                //   dispatch(
-                //     openModal('ModOverview', {
-                //       gameVersion,
-                //       projectID: id,
-                //       ...(isInstalled && { fileID: isInstalled.fileID }),
-                //       ...(isInstalled && { fileName: isInstalled.fileName }),
-                //       instanceName
-                //     })
-                //   );
-                // }}
+                onClick={() => {
+                  dispatch(
+                    openModal('ModrinthModOverview', {
+                      gameVersion,
+                      id,
+                      instanceName
+                    })
+                  );
+                }}
               >
                 Explore
               </Button>
@@ -241,11 +238,12 @@ const ModsListWrapper = ({
 
                   const mod = await getModrinthModVersion(versionIds[0]);
 
+                  console.log('test', versionIds, id);
+
                   const urlMod = mod?.files[0].url;
 
-                  await dispatch(
-                    installModrinthMod(id, urlMod, instanceName, gameVersion)
-                  );
+                  await dispatch(installModrinthMod(id, urlMod, instanceName));
+                  // installModrinthMod(id, urlMod, instanceName, gameVersion)
                   setLoading(false);
                 }}
                 loading={loading}
@@ -258,15 +256,13 @@ const ModsListWrapper = ({
           <Button
             type="primary"
             onClick={() => {
-              // dispatch(
-              //   openModal('ModOverview', {
-              //     gameVersion,
-              //     projectID: id,
-              //     ...(isInstalled && { fileID: isInstalled.fileID }),
-              //     ...(isInstalled && { fileName: isInstalled.fileName }),
-              //     instanceName
-              //   })
-              // );
+              dispatch(
+                openModal('ModrinthModOverview', {
+                  gameVersion,
+                  id,
+                  instanceName
+                })
+              );
             }}
           >
             Change version / explore

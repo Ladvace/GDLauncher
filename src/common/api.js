@@ -321,7 +321,6 @@ export const getModrinthMods = async (filter, modloader, limit, offset) => {
     offset || 0
   }${filter && `&index=${filter}`}&filters=${`categories="${modloader}"`}`;
 
-  console.log('url', url);
   return axios.get(url);
 };
 
