@@ -20,17 +20,12 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCheckCircle } from '@fortawesome/free-regular-svg-icons';
 import { faBomb, faExclamationCircle } from '@fortawesome/free-solid-svg-icons';
 import Modal from '../components/Modal';
-import { getSearch, getAddonFiles } from '../api';
+import { getSearch } from '../api';
 import { openModal } from '../reducers/modals/actions';
 import { _getInstance } from '../utils/selectors';
-import { installMod } from '../reducers/actions';
-import { FABRIC, FORGE } from '../utils/constants';
-import {
-  getFirstPreferredCandidate,
-  filterFabricFilesByVersion,
-  filterForgeFilesByVersion,
-  getPatchedInstanceType
-} from '../../app/desktop/utils';
+import { installResourcePack } from '../reducers/actions';
+import { FABRIC } from '../utils/constants';
+import { getPatchedInstanceType } from '../../app/desktop/utils';
 
 const RowContainer = styled.div`
   display: flex;
@@ -98,6 +93,7 @@ const ModsListWrapper = ({
 
   // Array of items loaded so far.
   items,
+  // version,
 
   // Callback function responsible for loading the next page of items.
   loadNextPage,
@@ -133,16 +129,17 @@ const ModsListWrapper = ({
 
   const Row = memo(({ index, style, data }) => {
     const [loading, setLoading] = useState(false);
-    const [error, setError] = useState(null);
-    const curseReleaseChannel = useSelector(
-      state => state.settings.curseReleaseChannel
-    );
+    // const [error, setError] = useState(null);
+
     const dispatch = useDispatch();
-    const { instanceName, gameVersion, installedMods, instance } = data;
+
+    const { instanceName, gameVersion, installedResourcePacks } = data;
 
     const item = items[index];
 
-    const isInstalled = installedMods.find(v => v.projectID === item?.id);
+    const isInstalled = installedResourcePacks.find(v => v.id === item?.id);
+
+    console.log('XXXX', isInstalled, installedResourcePacks, item);
     const primaryImage = item.attachments.find(v => v.isDefault);
 
     if (!item) {
@@ -165,7 +162,7 @@ const ModsListWrapper = ({
           top: style.top + (index === 0 ? 0 : 8),
           height: style.height - (index === 0 ? 0 : 8),
           position: 'absolute',
-          margin: '15px 10px',
+          margin: '10px 10px',
           transition: 'height 0.2s ease-in-out'
         }}
       >
@@ -203,93 +200,46 @@ const ModsListWrapper = ({
           </div>
         </RowInnerContainer>
         {!isInstalled ? (
-          error || (
-            <div>
-              <Button
-                type="primary"
-                css={`
-                  margin-right: 10px;
-                `}
-                onClick={() => {
-                  dispatch(
-                    openModal('ModOverview', {
-                      gameVersion,
-                      projectID: item.id,
-                      ...(isInstalled && { fileID: isInstalled.fileID }),
-                      ...(isInstalled && { fileName: isInstalled.fileName }),
-                      instanceName
-                    })
-                  );
-                }}
-              >
-                Explore
-              </Button>
-              <Button
-                type="primary"
-                onClick={async e => {
-                  setLoading(true);
-                  e.stopPropagation();
-                  const files = (await getAddonFiles(item?.id)).data;
+          <div>
+            <Button
+              type="primary"
+              css={`
+                margin-right: 10px;
+              `}
+              onClick={() => {
+                dispatch(
+                  openModal('ModOverview', {
+                    gameVersion,
+                    projectID: item.id,
+                    ...(isInstalled && { fileID: isInstalled.fileID }),
+                    ...(isInstalled && { fileName: isInstalled.fileName }),
+                    instanceName
+                  })
+                );
+              }}
+            >
+              Explore
+            </Button>
+            <Button
+              type="primary"
+              onClick={async e => {
+                setLoading(true);
+                e.stopPropagation();
 
-                  const isFabric = getPatchedInstanceType(instance) === FABRIC;
-                  const isForge = getPatchedInstanceType(instance) === FORGE;
+                console.log('CIAO', item);
 
-                  let filteredFiles = [];
-
-                  if (isFabric) {
-                    filteredFiles = filterFabricFilesByVersion(
-                      files,
-                      gameVersion
-                    );
-                  } else if (isForge) {
-                    filteredFiles = filterForgeFilesByVersion(
-                      files,
-                      gameVersion
-                    );
-                  }
-
-                  const preferredFile = getFirstPreferredCandidate(
-                    filteredFiles,
-                    curseReleaseChannel
-                  );
-
-                  if (preferredFile === null) {
-                    setLoading(false);
-                    setError('Mod Not Available');
-                    console.error(
-                      `Could not find any release candidate for addon: ${item?.id} / ${gameVersion}`
-                    );
-                    return;
-                  }
-
-                  let prev = 0;
-                  await dispatch(
-                    installMod(
-                      item?.id,
-                      preferredFile?.id,
-                      instanceName,
-                      gameVersion,
-                      true,
-                      p => {
-                        if (parseInt(p, 10) !== prev) {
-                          prev = parseInt(p, 10);
-                          ipcRenderer.invoke(
-                            'update-progress-bar',
-                            parseInt(p, 10) / 100
-                          );
-                        }
-                      }
-                    )
-                  );
-                  ipcRenderer.invoke('update-progress-bar', 0);
-                  setLoading(false);
-                }}
-                loading={loading}
-              >
-                Install
-              </Button>
-            </div>
-          )
+                // let prev = 0;
+                await dispatch(
+                  installResourcePack(item, instanceName, gameVersion)
+                );
+                ipcRenderer.invoke('update-progress-bar', 0);
+                setLoading(false);
+              }}
+              loading={loading}
+            >
+              Install
+            </Button>
+          </div>
         ) : (
           <Button
             type="primary"
@@ -345,14 +295,14 @@ const createItemData = memoize(
     items,
     instanceName,
     gameVersion,
-    installedMods,
+    installedResourcePacks,
     instance,
     isNextPageLoading
   ) => ({
     items,
     instanceName,
     gameVersion,
-    installedMods,
+    installedResourcePacks,
     instance,
     isNextPageLoading
   })
@@ -362,7 +312,7 @@ let lastRequest;
 const ModsBrowser = ({ instanceName, gameVersion }) => {
   const itemsNumber = 63;
 
-  const [mods, setMods] = useState([]);
+  const [resourcePacks, setResourcePacks] = useState([]);
   const [areModsLoading, setAreModsLoading] = useState(true);
   const [filterType, setFilterType] = useState('Featured');
   const [searchQuery, setSearchQuery] = useState('');
@@ -370,7 +320,9 @@ const ModsBrowser = ({ instanceName, gameVersion }) => {
   const [error, setError] = useState(false);
   const instance = useSelector(state => _getInstance(state)(instanceName));
 
-  const installedMods = instance?.mods;
+  // console.log('TEST', instance);
+
+  const installedResourcePacks = instance?.resourcePacks;
 
   const loadMoreModsDebounced = useDebouncedCallback(
     (s, reset) => {
@@ -402,32 +354,33 @@ const ModsBrowser = ({ instanceName, gameVersion }) => {
         setError(false);
       }
       ({ data } = await getSearch(
-        'mods',
+        'resourcepacks',
         searchP,
         itemsNumber,
-        isReset ? 0 : mods.length,
+        isReset ? 0 : resourcePacks.length,
         filterType,
         filterType !== 'Author' && filterType !== 'Name',
         gameVersion,
         getPatchedInstanceType(instance) === FABRIC ? 4780 : null
       ));
+      console.log('');
     } catch (err) {
       setError(err);
     }
 
-    const newMods = reset ? data : mods.concat(data);
+    const newMods = reset ? data : resourcePacks.concat(data);
     if (lastRequest === reqObj) {
       setAreModsLoading(false);
-      setMods(newMods || []);
+      setResourcePacks(newMods || []);
       setHasNextPage((newMods || []).length % itemsNumber === 0);
     }
   };
 
   const itemData = createItemData(
-    mods,
+    resourcePacks,
     instanceName,
     gameVersion,
-    installedMods,
+    installedResourcePacks,
     instance,
     areModsLoading
   );
@@ -439,7 +392,7 @@ const ModsBrowser = ({ instanceName, gameVersion }) => {
         width: 90%;
         max-width: 1500px;
       `}
-      title="Instance Manager"
+      title="ResourcePacks Manager"
     >
       <Container>
         <Header>
@@ -451,7 +404,6 @@ const ModsBrowser = ({ instanceName, gameVersion }) => {
             defaultValue={filterType}
             onChange={setFilterType}
             disabled={areModsLoading}
-            virtual={false}
           >
             <Select.Option value="Featured">Featured</Select.Option>
             <Select.Option value="Popularity">Popularity</Select.Option>
@@ -464,18 +416,18 @@ const ModsBrowser = ({ instanceName, gameVersion }) => {
             css={`
               height: 32px;
             `}
-            placeholder="Search for a mod"
+            placeholder="Search for a resourcepack"
             value={searchQuery}
             onChange={e => {
               setSearchQuery(e.target.value);
-              loadMoreModsDebounced(e.target.value, true);
+              loadMoreModsDebounced.callback(e.target.value, true);
             }}
             allowClear
           />
         </Header>
 
         {!error ? (
-          !areModsLoading && mods.length === 0 ? (
+          !areModsLoading && resourcePacks.length === 0 ? (
             <div
               css={`
                 margin-top: 120px;
@@ -492,7 +444,7 @@ const ModsBrowser = ({ instanceName, gameVersion }) => {
                   margin-top: 70px;
                 `}
               >
-                No mods has been found with the current filters.
+                No resourcePacks has been found with the current filters.
               </div>
             </div>
           ) : (
@@ -501,13 +453,13 @@ const ModsBrowser = ({ instanceName, gameVersion }) => {
                 <ModsListWrapper
                   hasNextPage={hasNextPage}
                   isNextPageLoading={areModsLoading}
-                  items={mods}
+                  items={resourcePacks}
                   width={width}
                   height={height - 50}
                   loadNextPage={loadMoreMods}
                   searchQuery={searchQuery}
                   version={gameVersion}
-                  installedMods={installedMods}
+                  installedResourcePacks={installedResourcePacks}
                   instanceName={instanceName}
                   itemData={itemData}
                 />
@@ -531,7 +483,7 @@ const ModsBrowser = ({ instanceName, gameVersion }) => {
                 margin-top: 70px;
               `}
             >
-              An error occurred while loading the mods list...
+              An error occurred while loading the resourcePacks list...
             </div>
           </div>
         )}

@@ -64,6 +64,9 @@ const modalsComponentLookupTable = {
   ModOverview: AsyncComponent(lazy(() => import('../modals/ModOverview'))),
   ModChangelog: AsyncComponent(lazy(() => import('../modals/ModChangelog'))),
   ModsBrowser: AsyncComponent(lazy(() => import('../modals/ModsBrowser'))),
+  ResourcePacksBrowser: AsyncComponent(
+    lazy(() => import('../modals/ResourcePacksBrowser'))
+  ),
   JavaSetup: AsyncComponent(lazy(() => import('../modals/JavaSetup'))),
   ModsUpdater: AsyncComponent(lazy(() => import('../modals/ModsUpdater'))),
   InstanceCrashed: AsyncComponent(

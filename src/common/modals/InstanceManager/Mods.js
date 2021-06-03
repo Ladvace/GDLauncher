@@ -566,6 +566,8 @@ const Mods = ({ instanceName }) => {
       const AllFilesAreCompleted = Object.keys(dragCompleted).every(x =>
         modList.find(y => y.fileName === x)
       );
+
+      console.log('DRAGCOMPL', modList, dragCompleted, AllFilesAreCompleted);
       setNumOfDraggedFiles(numOfDraggedFiles - 1);
 
       if (AllFilesAreCompleted) {

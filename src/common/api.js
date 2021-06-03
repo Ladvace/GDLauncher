@@ -263,10 +263,24 @@ export const getSearch = (
   gameVersion,
   categoryId
 ) => {
+  const mapTypeToId = t => {
+    switch (t) {
+      case 'mods':
+        return 6;
+      case 'modpacks':
+        return 4471;
+      case 'resourcepacks':
+        return 12;
+      default:
+        return 6;
+    }
+  };
+
   const url = `${FORGESVC_URL}/addon/search`;
   const params = {
     gameId: 432,
-    sectionId: type === 'mods' ? 6 : 4471,
+    // sectionId: type === 'mods' ? 6 : 4471,
+    sectionId: mapTypeToId(type),
     categoryId: categoryId || 0,
     pageSize,
     sort,

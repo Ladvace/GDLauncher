@@ -788,11 +788,20 @@ export const convertCompletePathToInstance = (f, instancesPath) => {
     return stringToGoIntoTheRegex.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
   };
 
+  console.log(
+    'regex',
+    f.replace(new RegExp(escapeRegExp(instancesPath), 'gi'), '')
+  );
   return f.replace(new RegExp(escapeRegExp(instancesPath), 'gi'), '');
 };
 
 export const isMod = (fileName, instancesPath) =>
-  /^(\\|\/)([\w\d-.{}()[\]@#$%^&!\s])+((\\|\/)mods((\\|\/)(.*))(\.jar|\.disabled))$/.test(
+  /^(\\|\/)([\w\d-.{}()[\]@#$%^&!\s])+((\\|\/)(mods((\\|\/)(.*))(\.jar|\.disabled)|resourcepacks((\\|\/)(.*))(\.zip)))$/.test(
+    convertCompletePathToInstance(fileName, instancesPath)
+  );
+
+export const isResourcePack = (fileName, instancesPath) =>
+  /^(\\|\/)([\w\d-.{}()[\]@#$%^&!\s])+((\\|\/)resourcepacks((\\|\/)(.*))(\.zip))$/.test(
     convertCompletePathToInstance(fileName, instancesPath)
   );
 

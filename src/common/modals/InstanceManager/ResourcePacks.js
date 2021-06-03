@@ -2,19 +2,21 @@ import React, { memo, useState, useEffect, useCallback } from 'react';
 import styled, { keyframes } from 'styled-components';
 import memoize from 'memoize-one';
 import path from 'path';
-import { promises as fs, watch } from 'fs';
+// import { promises as fs, watch } from 'fs';
 import makeDir from 'make-dir';
 import { ipcRenderer } from 'electron';
 import { FixedSizeList as List, areEqual } from 'react-window';
 import { Checkbox, Button, Switch } from 'antd';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faFolder, faTrash } from '@fortawesome/free-solid-svg-icons';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import AutoSizer from 'react-virtualized-auto-sizer';
 import fse from 'fs-extra';
 import curseForgeIcon from '../../assets/curseforgeIcon.webp';
-import { _getInstancesPath } from '../../utils/selectors';
+import { _getInstance, _getInstancesPath } from '../../utils/selectors';
 import DragnDropEffect from '../../../ui/DragnDropEffect';
+import { openModal } from '../../reducers/modals/actions';
+import { deleteResourcePack } from '../../reducers/actions';
 
 const Header = styled.div`
   height: 40px;
@@ -156,13 +158,15 @@ const OpenFolderButton = styled(FontAwesomeIcon)`
   }
 `;
 
-let watcher;
+// let watcher;
 
 const toggleResourcePackDisabled = async (c, instancePath, item) => {
-  const destFileName = c ? item.replace('.disabled', '') : `${item}.disabled`;
+  const destFileName = c
+    ? item.fileName.replace('.disabled', '')
+    : `${item.fileName}.disabled`;
 
   await fse.move(
-    path.join(instancePath, 'resourcepacks', item),
+    path.join(instancePath, 'resourcepacks', item.fileName),
     path.join(instancePath, 'resourcepacks', destFileName)
   );
 };
@@ -184,16 +188,25 @@ const NotItemsAvailable = styled.div`
   justify-content: center;
 `;
 
+const sort = arr =>
+  arr.slice().sort((a, b) => a.fileName.localeCompare(b.fileName));
+
 const ResourcePacks = ({ instanceName }) => {
+  const instance = useSelector(state => _getInstance(state)(instanceName));
   const instancesPath = useSelector(_getInstancesPath);
-  const [resourcePacks, setResourcePacks] = useState([]);
+  const [resourcePacks, setResourcePacks] = useState(
+    sort(instance?.resourcePacks)
+  );
   const [selectedItems, setSelectedItems] = useState([]);
   const resourcePacksPath = path.join(
     instancesPath,
     instanceName,
     'resourcepacks'
   );
+
+  console.log('carlo', resourcePacks, instance?.resourcePacks);
   const [loading, setLoading] = useState(false);
+  const dispatch = useDispatch();
 
   const deleteFile = useCallback(
     async (
@@ -205,7 +218,12 @@ const ResourcePacks = ({ instanceName }) => {
     ) => {
       if (item) {
         await fse.remove(
-          path.join(instancesPathh, instanceNamee, 'resourcepacks', item)
+          path.join(
+            instancesPathh,
+            instanceNamee,
+            'resourcepacks',
+            item.fileName
+          )
         );
       } else if (selectedItemss.length > 0) {
         await Promise.all(
@@ -221,13 +239,15 @@ const ResourcePacks = ({ instanceName }) => {
   const Row = memo(({ index, style, data }) => {
     const {
       items,
-      instanceName: name,
+      // instanceName: name,
       instancePath,
       selectedItems: slcItems,
-      setSelectedItems: setSlcItems,
-      resourcePacksPath: rscPacksPath
+      setSelectedItems: setSlcItems
+      // resourcePacksPath: rscPacksPath
     } = data;
+
     const item = items[index];
+    console.log('GESU', item);
     return (
       <RowContainer
         index={index}
@@ -240,27 +260,29 @@ const ResourcePacks = ({ instanceName }) => {
           margin: '15px 0',
           transition: 'height 0.2s ease-in-out'
         }}
-        selected={slcItems.includes(item)}
-        disabled={path.extname(item) === '.disabled'}
+        selected={slcItems.includes(item.fileName)}
+        disabled={path.extname(item.fileName) === '.disabled'}
       >
         <div className="leftPartContent">
           <Checkbox
-            checked={slcItems.includes(item)}
+            checked={slcItems.includes(item.displayName)}
             onChange={e => {
               if (e.target.checked) {
-                setSlcItems([...slcItems, item]);
+                setSlcItems([...slcItems, item.displayName]);
               } else {
-                setSlcItems(slcItems.filter(v => v !== item));
+                setSlcItems(slcItems.filter(v => v !== item.displayName));
               }
             }}
           />
           {item.fileID && <img src={curseForgeIcon} alt="curseforge" />}
         </div>
-        <div className="rowCenterContent">{item.replace('.disabled', '')}</div>
+        <div className="rowCenterContent">
+          {item.fileName.replace('.disabled', '')}
+        </div>
         <div className="rightPartContent">
           <Switch
             size="small"
-            checked={path.extname(item) !== '.disabled'}
+            checked={path.extname(item.fileName) !== '.disabled'}
             disabled={loading}
             onChange={async c => {
               setLoading(true);
@@ -271,14 +293,18 @@ const ResourcePacks = ({ instanceName }) => {
           <TrashIcon
             selectedMods
             onClick={() => {
-              deleteFile(item, instancesPath, slcItems, rscPacksPath, name);
+              // deleteFile(item, instancesPath, slcItems, rscPacksPath, name);
+              if (!loading) {
+                console.log('DIO', item, items);
+                dispatch(deleteResourcePack(instanceName, item));
+              }
             }}
             icon={faTrash}
           />
         </div>
         <RowContainerBackground
-          selected={slcItems.includes(item)}
-          disabled={path.extname(item) === '.disabled'}
+          selected={slcItems.includes(item.fileName)}
+          disabled={path.extname(item.fileName) === '.disabled'}
         />
       </RowContainer>
     );
@@ -302,24 +328,13 @@ const ResourcePacks = ({ instanceName }) => {
     ipcRenderer.invoke('openFolder', p);
   };
 
-  const startListener = async () => {
-    await makeDir(resourcePacksPath);
-    const files = await fs.readdir(resourcePacksPath);
-    setResourcePacks(files);
-    watcher = watch(resourcePacksPath, async (event, filename) => {
-      if (filename) {
-        const resourcePackFiles = await fs.readdir(resourcePacksPath);
-        setResourcePacks(resourcePackFiles);
-        setSelectedItems(prev => {
-          return prev.filter(v => resourcePackFiles.includes(v));
-        });
-      }
-    });
-  };
+  useEffect(() => {
+    setResourcePacks(instance.resourcePacks);
+  }, [instance.resourcePacks]);
 
   useEffect(() => {
-    startListener();
-    return () => watcher?.close();
+    // startListener();
+    // return () => watcher?.close();
   }, []);
 
   const itemData = createItemData(
@@ -387,6 +402,19 @@ const ResourcePacks = ({ instanceName }) => {
             icon={faFolder}
           />
         </div>
+        <Button
+          type="primary"
+          onClick={() => {
+            dispatch(
+              openModal('ResourcePacksBrowser', {
+                gameVersion: instance.loader?.mcVersion,
+                instanceName
+              })
+            );
+          }}
+        >
+          Browse ResourcePacks
+        </Button>
         <Button
           css={`
             margin: 0 10px;

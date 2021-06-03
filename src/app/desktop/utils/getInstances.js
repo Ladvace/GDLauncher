@@ -68,6 +68,17 @@ const getInstances = async instancesPath => {
         return { ...patchedConfig, name: instance };
       }
 
+      if (!config?.resourcePacks) {
+        const patchedConfig = {
+          ...config,
+          resourcePacks: []
+        };
+
+        await fse.writeFile(configPath, JSON.stringify(patchedConfig));
+
+        return { ...patchedConfig, name: instance };
+      }
+
       if (
         config.loader?.fileId ||
         config.loader?.addonId ||

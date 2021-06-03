@@ -93,6 +93,7 @@ const DragnDropEffect = ({
     setFileDrop(true);
     const dragComp = {};
     const { files } = e.dataTransfer;
+    console.log('KKK', files, Object.values(files));
     const arrTypes = Object.values(files).map(file => {
       const fileName = file.name;
       const fileType = path.extname(fileName);
@@ -119,6 +120,12 @@ const DragnDropEffect = ({
           setFileDrop(false);
           setFileDrag(false);
         } else if (Object.values(files).length === 1) {
+          console.log(
+            'dgg',
+            fileType === '.zip' ||
+              fileType === '.7z' ||
+              fileType === '.disabled'
+          );
           if (
             fileType === '.zip' ||
             fileType === '.7z' ||
@@ -182,6 +189,7 @@ const DragnDropEffect = ({
         fileList.find(y => y === x)
       );
 
+      console.log('DRAGCOMPL', fileList, dragCompleted, AllFilesAreCompleted);
       setNumOfDraggedFiles(numOfDraggedFiles - 1);
 
       if (AllFilesAreCompleted) {

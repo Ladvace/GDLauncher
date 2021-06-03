@@ -93,6 +93,7 @@ import {
   normalizeModData,
   reflect,
   isMod,
+  isResourcePack,
   isInstanceFolderPath,
   getFileHash,
   getFilesRecursive,
@@ -1084,6 +1085,7 @@ export function addToQueue(
             timePlayed: prev.timePlayed || timePlayed || 0,
             background,
             mods: prev.mods || [],
+            resourcePacks: prev.resourcePacks || [],
             ...patchedSettings
           };
         },
@@ -1114,6 +1116,8 @@ export function downloadFabric(instanceName) {
     const { loader } = _getCurrentDownloadItem(state);
 
     dispatch(updateDownloadStatus(instanceName, 'Downloading fabric files...'));
+
+    console.log('PORCONE', loader);
 
     let fabricJson;
     const fabricJsonPath = path.join(
@@ -2082,16 +2086,28 @@ export const startListener = () => {
       const processChange = async () => {
         const newState = getState();
         const instance = _getInstance(newState)(instanceName);
-        const isInConfig = (instance?.mods || []).find(
+        const isModInConfig = (instance?.mods || []).find(
           mod => mod.fileName === path.basename(fileName)
         );
+        const isResourcePackInConfig = (instance?.resourcePacks || []).find(
+          resourcePack => resourcePack.fileName === path.basename(fileName)
+        );
+
         try {
           const stat = await fs.lstat(fileName);
 
-          if (instance?.mods && !isInConfig && stat.isFile() && instance) {
+          if (
+            instance?.mods &&
+            instance?.resourcePacks &&
+            !isModInConfig &&
+            !isResourcePackInConfig &&
+            stat.isFile() &&
+            instance
+          ) {
             // get murmur hash
             const murmurHash = await getFileMurmurHash2(fileName);
             const { data } = await getAddonsByFingerprint([murmurHash]);
+
             const exactMatch = (data.exactMatches || [])[0];
             const notMatch = (data.unmatchedFingerprints || [])[0];
             let mod = {};
@@ -2326,6 +2342,7 @@ export const startListener = () => {
           }
           if (event.action !== 2 && !changesTracker[completePath]) {
             // If we cannot find it in the hash table, it's a new event
+
             changesTracker[completePath] = {
               action: event.action,
               completed:
@@ -2390,6 +2407,7 @@ export const startListener = () => {
 
       Object.entries(changesTracker).map(
         async ([fileName, { action, completed, newFilePath }]) => {
+          console.log('SSZSZSZSZ');
           const filePath = newFilePath || fileName;
           // Events are dispatched 3 times. Wait for 3 dispatches to be sure
           // that the action was completely executed
@@ -2418,11 +2436,15 @@ export const startListener = () => {
             });
             if (isLocked) return;
 
+            console.log('HHHH', fileName, instancesPath, newFilePath);
+
             if (
-              isMod(fileName, instancesPath) &&
+              (isMod(fileName, instancesPath) ||
+                isResourcePack(fileName, instancesPath)) &&
               _getInstance(getState())(instanceName) &&
               action !== 3
             ) {
+              console.log('UU');
               if (action === 0) {
                 processAddedFile(filePath, instanceName);
               } else if (action === 1) {
@@ -2440,28 +2462,50 @@ export const startListener = () => {
               )
                 .substr(1)
                 .split(path.sep)[0];
+
+              console.log(
+                'DDD',
+                oldInstanceName === instanceName,
+                isResourcePack(newFilePath, instancesPath),
+                isResourcePack(fileName, instancesPath)
+              );
+
               if (
-                oldInstanceName === instanceName &&
-                isMod(newFilePath, instancesPath) &&
-                isMod(fileName, instancesPath)
+                (oldInstanceName === instanceName &&
+                  isMod(newFilePath, instancesPath) &&
+                  isMod(fileName, instancesPath)) ||
+                (oldInstanceName === instanceName &&
+                  isResourcePack(newFilePath, instancesPath) &&
+                  isResourcePack(fileName, instancesPath))
               ) {
+                console.log('UNO');
                 processRenamedFile(fileName, instanceName, newFilePath);
               } else if (
-                oldInstanceName !== instanceName &&
-                isMod(newFilePath, instancesPath) &&
-                isMod(fileName, instancesPath)
+                (oldInstanceName !== instanceName &&
+                  isMod(newFilePath, instancesPath) &&
+                  isMod(fileName, instancesPath)) ||
+                (oldInstanceName !== instanceName &&
+                  isResourcePack(newFilePath, instancesPath) &&
+                  isResourcePack(fileName, instancesPath))
               ) {
+                console.log('DUE');
                 processRemovedFile(fileName, oldInstanceName);
                 processAddedFile(newFilePath, instanceName);
               } else if (
-                !isMod(newFilePath, instancesPath) &&
-                isMod(fileName, instancesPath)
+                (!isMod(newFilePath, instancesPath) &&
+                  isMod(fileName, instancesPath)) ||
+                (!isResourcePack(newFilePath, instancesPath) &&
+                  isResourcePack(fileName, instancesPath))
               ) {
+                console.log('TRE');
                 processRemovedFile(fileName, oldInstanceName);
               } else if (
-                isMod(newFilePath, instancesPath) &&
-                !isMod(fileName, instancesPath)
+                (isMod(newFilePath, instancesPath) &&
+                  !isMod(fileName, instancesPath)) ||
+                (isResourcePack(newFilePath, instancesPath) &&
+                  !isResourcePack(fileName, instancesPath))
               ) {
+                console.log('QUATT');
                 processAddedFile(newFilePath, instanceName);
               }
             } else if (isInstanceFolderPath(filePath, instancesPath)) {
@@ -2726,6 +2770,82 @@ export function launchInstance(instanceName) {
     });
   };
 }
+
+export function installResourcePack(item, instanceName, gameVersion) {
+  return async (dispatch, getState) => {
+    const state = getState();
+    const instancesPath = _getInstancesPath(state);
+    const instancePath = path.join(instancesPath, instanceName);
+
+    // const resourcepack = item.latestFiles.find(rp =>
+    //   rp.gameVersion.includes(gameVersion)
+    // );
+    const resourcepack = item.latestFiles[0];
+
+    const {
+      downloadUrl,
+      displayName,
+      gameVersion: gameVer,
+      fileName
+    } = resourcepack;
+
+    console.log('PROv', displayName, gameVersion, item, resourcepack);
+
+    const resourcePackPath = path.join(instancePath, 'resourcepacks', fileName);
+
+    await downloadFile(resourcePackPath, downloadUrl);
+
+    await dispatch(
+      updateInstanceConfig(instanceName, prev => {
+        const needToSourcePack = !prev.resourcePacks?.find(v => {
+          return v.id === item.id;
+        });
+        console.log('OKKK', item, prev.resourcePacks, prev);
+        return {
+          ...prev,
+          resourcePacks: [
+            ...prev.resourcePacks,
+            ...(needToSourcePack
+              ? [
+                  {
+                    id: item.id,
+                    displayName,
+                    gameVersion: gameVer,
+                    downloadUrl,
+                    fileName
+                  }
+                ]
+              : [])
+          ]
+        };
+      })
+    );
+  };
+}
+
+export const deleteResourcePack = (instanceName, resourcepack) => {
+  return async (dispatch, getState) => {
+    const instancesPath = _getInstancesPath(getState());
+    await dispatch(
+      updateInstanceConfig(instanceName, prev => ({
+        ...prev,
+        resourcePacks: prev.resourcePacks.filter(
+          r => r.fileName !== resourcepack.fileName
+        )
+      }))
+    );
+
+    console.log('DELTE', instanceName, resourcepack, resourcepack.fileName);
+    await fse.remove(
+      path.join(
+        instancesPath,
+        instanceName,
+        'resourcepacks',
+        resourcepack.fileName
+      )
+    );
+  };
+};
 
 export function installMod(
   projectID,
